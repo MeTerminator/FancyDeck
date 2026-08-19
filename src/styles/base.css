@@ -1,0 +1,21 @@
+/**
+ * 只给展示页用的全局重置。管理后台不加载它，
+ * 免得 overflow:hidden 之类的规则把后台的滚动条弄没。
+ */
+
+@import './fonts.css';
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--fd-bg);
+  color: var(--fd-text-primary);
+  font-family: var(--fd-font-text);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}

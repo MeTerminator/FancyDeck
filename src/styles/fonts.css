@@ -1,0 +1,27 @@
+/**
+ * 自带字体。展示页与管理后台都要加载，所以单独一份，两边各 import 一次。
+ *
+ * 字体文件放在 public/fonts/，构建时原样拷进 dist，路径是绝对的 /fonts/…，
+ * 展示页（/）与后台（/console/…）都能取到。
+ *
+ * 注意 HarmonyOS Sans **只有西文**（874 个码位，一个汉字都没有），
+ * 所以它只能排数字和拉丁字母，中文一律落到后面的 Noto Sans SC / PingFang SC。
+ * 字体栈里的顺序就是按这个来的，别指望它接管中文。
+ */
+
+@font-face {
+  font-family: 'HarmonyOS Sans';
+  src: url('/fonts/HarmonyOS_Sans_Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  /* 字体没到位时先用后备字体显示，别让屏幕空着 */
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HarmonyOS Sans';
+  src: url('/fonts/HarmonyOS_Sans_Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

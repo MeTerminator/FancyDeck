@@ -1,0 +1,387 @@
+/**
+ * 卡片与面板的样式。展示页与管理后台的预览共用这一份，
+ * 全部选择器都以 .fd- 开头，不碰任何标签选择器，可以安全地和 Tailwind 共存。
+ */
+
+.fd-shell *,
+.fd-shell *::before,
+.fd-shell *::after {
+  box-sizing: border-box;
+}
+
+/* ── 面板 ────────────────────────────────────────────────── */
+
+.fd-board {
+  display: grid;
+  gap: var(--fd-gap);
+  padding: var(--fd-padding);
+  width: 100%;
+  height: 100%;
+  background: var(--fd-bg);
+  /* 退场的替身钉在这上面，所以要有定位上下文 */
+  position: relative;
+}
+
+.fd-board--empty {
+  place-items: center;
+}
+
+/* 每个落位的外壳，卡片自己撑满它 */
+.fd-cell {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 新出现的卡片淡进。位移与缩放由 Board.tsx 用 FLIP 逐张算，不在这儿写死。 */
+@keyframes fd-cell-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 上一套布局里有、这一套没有的卡片：钉在旧位置淡出，不占新网格的格子 */
+.fd-ghost {
+  position: absolute;
+  pointer-events: none;
+  animation: fd-cell-out var(--fd-transition, 420ms) cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+@keyframes fd-cell-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-ghost {
+    display: none;
+  }
+}
+
+/* 面板的尺寸由外层给：展示页给满屏，后台预览给一个小方框 */
+.fd-shell {
+  height: 100%;
+  overflow: hidden;
+  background: var(--fd-bg);
+}
+
+/* 断线指示：右上角一个几乎看不见的小点，别打扰摆件 */
+.fd-offline {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 20;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fd-accent);
+  animation: fd-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes fd-pulse {
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-board,
+  .fd-cell,
+  .fd-offline {
+    animation: none;
+  }
+}
+
+/* ── 格子 ────────────────────────────────────────────────── */
+
+.fd-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2vmin;
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(16px, 2.6vmin, 34px);
+  overflow: hidden;
+  background: var(--fd-cell);
+  border-radius: var(--fd-radius);
+}
+
+.fd-tile--active {
+  background: var(--fd-cell-active);
+}
+
+.fd-tile__label {
+  flex-shrink: 0;
+  color: var(--fd-text-muted);
+  font-size: clamp(10px, 1.15vmin, 13px);
+  letter-spacing: 0.3em;
+  /*
+   * 往上提一截，贴近格子上沿。
+   * 格位标签本来就是「贴边的小字」，留和正文一样宽的内边距会显得头重；
+   * 提上去之后中间那块内容区也能多拿一点高度。
+   * 这里减掉的是 .fd-tile padding 的一半，两边跟着同一个 clamp 走。
+   */
+  margin-top: calc(clamp(16px, 2.6vmin, 34px) / -2);
+}
+
+.fd-tile__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+
+.fd-tile__foot {
+  flex-shrink: 0;
+  color: var(--fd-text-secondary);
+  font-size: clamp(11px, 1.35vmin, 15px);
+  letter-spacing: 0.1em;
+}
+
+/* ── 跑马灯 ──────────────────────────────────────────────── */
+
+/*
+ * 一行字放不下时让它匀速滚过去。内容复制两份首尾相接，
+ * 位移到 -50% 正好接上第一份的开头，所以循环处看不出断点。
+ * 只有真的溢出了才由 JS 加上 --scroll 修饰类，没溢出时就是普通一行字。
+ */
+.fd-marquee {
+  /* 不许被压扁：它是 flex 列里的一员，格子矮的时候兄弟们会把它挤没，
+     再叠上 overflow:hidden，字就只剩一条缝 */
+  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fd-marquee__track {
+  display: inline-flex;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.fd-marquee--scroll .fd-marquee__track {
+  animation: fd-marquee var(--fd-marquee-duration, 12s) linear infinite;
+}
+
+/* 两端的淡出只在真的滚起来时才有意义——一行放得下的字不该被无故啃掉边 */
+.fd-marquee--scroll {
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+}
+
+/* 每份内容后面都跟一个等宽的间隔，两份加起来才是整齐的两个周期 */
+.fd-marquee__unit {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.fd-marquee__gap {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 3em;
+}
+
+@keyframes fd-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-marquee--scroll .fd-marquee__track {
+    animation: none;
+  }
+}
+
+/* ── 排版 ────────────────────────────────────────────────── */
+
+.fd-display {
+  color: var(--fd-text-primary);
+  font-family: var(--fd-font-display);
+  /* 无衬线数字在超大号下偏重，压到 300 才有原来那股清瘦劲 */
+  font-weight: 300;
+  /* 等宽数字：秒数跳动时后面的字不会跟着左右晃 */
+  font-variant-numeric: tabular-nums;
+  line-height: 0.86;
+}
+
+.fd-heading {
+  font-family: var(--fd-font-heading);
+  /*
+   * 标题一级用 Bold。代码里的用法本来就分两种：
+   *   fd-heading            标题、曲名、农历日期这类主角 → 加粗
+   *   fd-heading fd-secondary/fd-muted   跟在主角后面的附注 → 保持常规
+   * 所以下面把后者拨回 400，不用去每处改类名。
+   */
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fd-heading.fd-secondary,
+.fd-heading.fd-muted {
+  font-weight: 400;
+}
+
+.fd-muted {
+  color: var(--fd-text-muted);
+}
+
+.fd-secondary {
+  color: var(--fd-text-secondary);
+}
+
+.fd-accent {
+  color: var(--fd-accent);
+}
+
+.fd-row {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(6px, 1vmin, 14px);
+}
+
+.fd-rule {
+  height: 1px;
+  background: var(--fd-line);
+}
+
+.fd-dot {
+  flex-shrink: 0;
+  width: 0.7vmin;
+  min-width: 5px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--fd-accent);
+}
+
+/* ── 进度条 ──────────────────────────────────────────────── */
+
+.fd-progress {
+  display: flex;
+  align-items: center;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.fd-progress__track {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 3px;
+  background: var(--fd-track);
+}
+
+.fd-progress__fill {
+  height: 3px;
+  background: var(--fd-accent);
+}
+
+.fd-progress__knob {
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--fd-accent);
+}
+
+/* ── 控件 ────────────────────────────────────────────────── */
+
+.fd-control {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--fd-text-primary);
+  cursor: pointer;
+}
+
+.fd-control--primary {
+  min-width: 56px;
+  min-height: 56px;
+  border: 1px solid var(--fd-line);
+}
+
+.fd-control:focus-visible {
+  outline: 2px solid var(--fd-accent);
+  outline-offset: 2px;
+}
+
+.fd-tile--button {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fd-tile--button:focus-visible {
+  outline: 2px solid var(--fd-accent);
+  outline-offset: -2px;
+}
+
+/* ── 设备行（HA 格子内） ─────────────────────────────────── */
+
+.fd-devrow {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.4vmin;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fd-devrow:focus-visible {
+  outline: 2px solid var(--fd-accent);
+  outline-offset: 4px;
+}
+
+.fd-bar {
+  height: 3px;
+  background: var(--fd-track);
+}
+
+.fd-bar__fill {
+  height: 3px;
+  background: var(--fd-accent);
+  transition: width 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fd-bar__fill {
+    transition: none;
+  }
+}
