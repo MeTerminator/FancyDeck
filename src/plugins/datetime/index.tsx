@@ -70,7 +70,7 @@ export default definePlugin<DateTimeState>({
         // 占的格子越大字越大：跨 2 格以上时才放到最大号
         const scale = Math.min(span.cols, span.rows * 1.4)
         return (
-          <Tile>
+          <Tile fit>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2vmin' }}>
               <div className="fd-row">
                 <div
@@ -114,7 +114,7 @@ export default definePlugin<DateTimeState>({
         const lunar = lunarFor(now)
         const foot = settings.showLunar !== false ? state.festival || lunar.date : now.getFullYear()
         return (
-          <Tile label="日期" foot={foot}>
+          <Tile label="日期" foot={foot} fit>
             <div className="fd-row">
               <div className="fd-display" style={{ fontSize: 'clamp(46px, 10vmin, 150px)' }}>
                 {now.getDate()}
@@ -133,7 +133,7 @@ export default definePlugin<DateTimeState>({
       description: '只显示星期几',
       size: { minCols: 1, minRows: 1, defaultCols: 1, defaultRows: 1 },
       render: ({ now }) => (
-        <Tile label="星期">
+        <Tile label="星期" fit>
           <div className="fd-heading" style={{ fontSize: 'clamp(26px, 5.6vmin, 70px)' }}>
             {weekdayCN(now)}
           </div>
@@ -146,7 +146,7 @@ export default definePlugin<DateTimeState>({
       description: '第一行 08/19，第二行星期几',
       size: { minCols: 1, minRows: 1, defaultCols: 1, defaultRows: 1 },
       render: ({ now, span }) => (
-        <Tile>
+        <Tile fit>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1vmin' }}>
             <div
               className="fd-display"
@@ -173,7 +173,7 @@ export default definePlugin<DateTimeState>({
       render: ({ now, state }) => {
         const lunar = lunarFor(now)
         return (
-          <Tile label="星期" foot={state.festival || termLine(lunar)}>
+          <Tile label="星期" foot={state.festival || termLine(lunar)} fit>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.6vmin' }}>
               <div className="fd-heading" style={{ fontSize: 'clamp(26px, 5vmin, 62px)' }}>
                 {weekdayCN(now)}
@@ -198,9 +198,9 @@ export default definePlugin<DateTimeState>({
         const lunar = lunarFor(now)
 
         /**
-         * 一块四档，最小 1×1 就把农历该说的都说完了：
-         *   1×1    农历日期 + 生肖 + 干支
-         *   1×2    + 宜忌（往下堆）+ 下一个节气（脚注折成两行）
+         * 一块四档，最小 1×1 也展示完整的农历信息：
+         *   1×1    与 1×2 内容一致，用紧凑排版容纳
+         *   1×2    农历日期 + 生肖 + 干支 + 宜忌 + 下一个节气
          *   2×1    + 宜忌（宽而矮，堆不下，改放右边那块空白）+ 下一个节气
          *   2×2 起 全都有
          *
@@ -208,22 +208,29 @@ export default definePlugin<DateTimeState>({
          */
         const wide = span.cols >= 2
         const tall = span.rows >= 2
+        const compact = !wide && !tall
         const sideBySide = wide && !tall
-        const showYiJi = wide || tall
-        // 比 1×1 大就放得下：一列宽时脚注会折成两行，两行高的格子有这个余量
-        const showNextTerm = wide || tall
 
         const scale = Math.min(span.cols, span.rows * 1.4)
         const footParts = [
           state.festival,
           termLine(lunar),
-          showNextTerm ? `${lunar.nextTerm.name}还有 ${lunar.nextTerm.inDays} 天` : '',
+          `${lunar.nextTerm.name}还有 ${lunar.nextTerm.inDays} 天`,
         ].filter(Boolean)
         // 一列宽时一行放不下，与其让它在句子中间折断，不如自己分行
         const foot = wide ? (
           footParts.join(' · ')
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25em' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: compact ? '0.08em' : '0.25em',
+              fontSize: compact ? 'clamp(9px, 1vmin, 11px)' : undefined,
+              lineHeight: compact ? 1.15 : undefined,
+              letterSpacing: compact ? '0.04em' : undefined,
+            }}
+          >
             {footParts.map((part) => (
               <div key={part}>{part}</div>
             ))}
@@ -231,14 +238,14 @@ export default definePlugin<DateTimeState>({
         )
 
         const lunarBlock = (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2vmin', minWidth: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? '0.35vmin' : '1.2vmin', minWidth: 0 }}>
             <div className="fd-row" style={{ flexWrap: 'wrap', rowGap: '0.4vmin' }}>
-              <div className="fd-heading" style={{ fontSize: `clamp(22px, ${3 + scale * 2.2}vmin, 84px)` }}>
+              <div className="fd-heading" style={{ fontSize: compact ? 'clamp(18px, 3.6vmin, 34px)' : `clamp(22px, ${3 + scale * 2.2}vmin, 84px)` }}>
                 {lunar.date}
               </div>
               <div
                 className="fd-heading fd-muted"
-                style={{ fontSize: 'clamp(12px, 1.7vmin, 20px)', letterSpacing: '0.18em' }}
+                style={{ fontSize: compact ? 'clamp(10px, 1.25vmin, 14px)' : 'clamp(12px, 1.7vmin, 20px)', letterSpacing: '0.18em' }}
               >
                 {lunar.zodiac}年
               </div>
@@ -249,7 +256,7 @@ export default definePlugin<DateTimeState>({
                 display: 'flex',
                 flexWrap: 'wrap',
                 gap: '0.3vmin 0.7ch',
-                fontSize: `clamp(12px, ${1.7 + scale * 0.2}vmin, 24px)`,
+                fontSize: compact ? 'clamp(10px, 1.2vmin, 13px)' : `clamp(12px, ${1.7 + scale * 0.2}vmin, 24px)`,
                 letterSpacing: '0.06em',
               }}
             >
@@ -262,11 +269,11 @@ export default definePlugin<DateTimeState>({
         )
 
         const yiJiLine = (title: string, items: string[]) => (
-          <div className="fd-row" style={{ flexWrap: 'wrap', gap: '0.3vmin 1.2vmin' }}>
-            <div className="fd-heading fd-accent" style={{ fontSize: 'clamp(13px, 1.9vmin, 22px)' }}>
+          <div className="fd-row" style={{ flexWrap: 'wrap', gap: compact ? '0.1vmin 0.5vmin' : '0.3vmin 1.2vmin' }}>
+            <div className="fd-heading fd-accent" style={{ fontSize: compact ? 'clamp(10px, 1.2vmin, 13px)' : 'clamp(13px, 1.9vmin, 22px)' }}>
               {title}
             </div>
-            <div className="fd-heading fd-secondary" style={{ fontSize: 'clamp(12px, 1.7vmin, 20px)' }}>
+            <div className="fd-heading fd-secondary" style={{ fontSize: compact ? 'clamp(9px, 1.05vmin, 12px)' : 'clamp(12px, 1.7vmin, 20px)' }}>
               {items.length > 0 ? items.join(' ') : '无'}
             </div>
           </div>
@@ -275,7 +282,7 @@ export default definePlugin<DateTimeState>({
         // 宜忌本地算，上报了就以上报的为准。
         // 一天能给出十几条，格子放不下就截；只有一行高时留得更少，
         // 否则「宜」一折行就把「忌」挤出可视区，看起来像没显示。
-        const maxActs = span.rows >= 2 ? 6 : 3
+        const maxActs = compact || span.rows >= 2 ? 6 : 3
         const suitable = (state.suitable.length > 0 ? state.suitable : lunar.suitable).slice(0, maxActs)
         const avoid = (state.avoid.length > 0 ? state.avoid : lunar.avoid).slice(0, maxActs)
 
@@ -286,7 +293,7 @@ export default definePlugin<DateTimeState>({
               flex: '1 1 0',
               flexDirection: 'column',
               justifyContent: 'center',
-              gap: '1vmin',
+              gap: compact ? '0.25vmin' : '1vmin',
               minWidth: 0,
             }}
           >
@@ -302,25 +309,33 @@ export default definePlugin<DateTimeState>({
           <div className="fd-rule" style={{ width: '100%' }} />
         )
 
+        const body = (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: sideBySide ? 'row' : 'column',
+              alignItems: sideBySide ? 'stretch' : undefined,
+              gap: sideBySide ? '2.4vmin' : compact ? '0.35vmin' : '1.4vmin',
+              minWidth: 0,
+            }}
+          >
+            {lunarBlock}
+            {divider}
+            {yiJiBlock}
+          </div>
+        )
+
+        if (compact) {
+          return (
+            <Tile foot={foot} fit style={{ padding: 'clamp(10px, 1.35vmin, 18px)' }}>
+              {body}
+            </Tile>
+          )
+        }
+
         return (
-          <Tile foot={foot}>
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: sideBySide ? 'row' : 'column',
-                alignItems: sideBySide ? 'stretch' : undefined,
-                gap: sideBySide ? '2.4vmin' : '1.4vmin',
-                minWidth: 0,
-              }}
-            >
-              {lunarBlock}
-              {showYiJi && (
-                <>
-                  {divider}
-                  {yiJiBlock}
-                </>
-              )}
-            </div>
+          <Tile foot={foot} fit>
+            {body}
           </Tile>
         )
       },

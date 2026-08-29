@@ -151,6 +151,38 @@
   letter-spacing: 0.1em;
 }
 
+.fd-autofit {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fd-autofit__content {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform-origin: left center;
+}
+
+.fd-tile__fit {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2vmin;
+}
+
+.fd-tile__fit .fd-tile__body {
+  flex: 0 1 auto;
+}
+
+/* 自动放大后负边距也会被同比放大，短内容卡会把标签推到卡片外。 */
+.fd-tile__fit .fd-tile__label {
+  margin-top: 0;
+}
+
 /* ── 跑马灯 ──────────────────────────────────────────────── */
 
 /*

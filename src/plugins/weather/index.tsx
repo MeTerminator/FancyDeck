@@ -56,6 +56,7 @@ export default definePlugin<WeatherState>({
       render: ({ state: w }) => (
         <Tile
           label="天气"
+          fit
           foot={[`${w.city} · ${w.low}° / ${w.high}°`, w.aqi > 0 ? `AQI ${w.aqi} ${w.aqiLevel}` : '']
             .filter(Boolean)
             .join(' · ')}
@@ -101,7 +102,7 @@ export default definePlugin<WeatherState>({
       description: '只有温度和状况，适合塞进 1×1 的角落',
       size: { minCols: 1, minRows: 1, defaultCols: 1, defaultRows: 1 },
       render: ({ state: w }) => (
-        <Tile label={w.city}>
+        <Tile label={w.city} fit>
           <div className="fd-row">
             <span className="fd-display" style={{ fontSize: 'clamp(32px, 7vmin, 92px)' }}>
               {Math.round(w.temperature)}°

@@ -14,6 +14,8 @@ export type AgendaEvent = {
 export type AgendaState = {
   events: AgendaEvent[]
   updatedAt: number
+  /** 最近一次 ICS 同步失败的原因；成功后清空。 */
+  syncError?: string
 }
 
 export const emptyAgenda: AgendaState = { events: [], updatedAt: 0 }

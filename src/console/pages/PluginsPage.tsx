@@ -47,7 +47,7 @@ export function PluginsPage() {
         {allPlugins.map((plugin) => {
           const Icon = pluginIcon(plugin.icon)
           const enabled = isPluginEnabled(config, plugin.id)
-          const state = states[plugin.id] as { updatedAt?: number } | undefined
+          const state = states[plugin.id] as { updatedAt?: number; syncError?: string } | undefined
           const live = typeof state?.updatedAt === 'number' && state.updatedAt > 0
           const used = usage(plugin.id)
           const activeHere = resolution?.preset.slots.some((s) => s.card.startsWith(`${plugin.id}:`))
@@ -78,8 +78,13 @@ export function PluginsPage() {
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   <Badge variant={live ? 'success' : 'muted'} className="gap-1">
                     <Radio className="size-2.5" />
-                    {live ? '有数据上报' : plugin.routes ? '等待上报' : '本地数据'}
+                    {live ? '数据已更新' : plugin.routes ? '等待数据' : '本地数据'}
                   </Badge>
+                  {state?.syncError && (
+                    <Badge variant="destructive" title={state.syncError}>
+                      同步失败
+                    </Badge>
+                  )}
                   <Badge variant="outline">{plugin.cards.length} 张卡片</Badge>
                   {plugin.triggers && plugin.triggers.length > 0 && (
                     <Badge variant="outline">{plugin.triggers.length} 个触发条件</Badge>

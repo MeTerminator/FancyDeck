@@ -40,16 +40,45 @@ function countdown(event: AgendaEvent, now: number): string {
 export default definePlugin<AgendaState>({
   id: 'agenda',
   name: '日程',
-  description: '来自系统日历的下一件事，可按临近程度触发布局切换。',
+  description: '通过 ICS 订阅或手动上报获取日程，可按临近程度触发布局切换。',
   icon: 'CalendarClock',
   defaultState: emptyAgenda,
 
   routes: [
     { method: 'POST', path: '/api/p/agenda/events', description: '整批上报日程（覆盖式）' },
+    { method: 'POST', path: '/api/p/agenda/refresh', description: '立即刷新 ICS 订阅' },
     { method: 'GET', path: '/api/p/agenda/state', description: '读当前日程' },
   ],
 
   settings: [
+    {
+      key: 'icsUrl',
+      label: 'ICS 订阅链接',
+      type: 'string',
+      default: '',
+      placeholder: 'https://example.com/calendar.ics',
+      help: '支持 webcal://、http:// 和 https://。保存后会立即同步一次。',
+    },
+    {
+      key: 'refreshMinutes',
+      label: '自动更新间隔',
+      type: 'number',
+      default: 15,
+      min: 5,
+      max: 1440,
+      step: 5,
+      unit: '分钟',
+    },
+    {
+      key: 'fetchDays',
+      label: '拉取未来日程',
+      type: 'number',
+      default: 30,
+      min: 1,
+      max: 365,
+      step: 1,
+      unit: '天',
+    },
     { key: 'lookaheadHours', label: '只看未来', type: 'number', default: 24, min: 1, max: 168, step: 1, unit: '小时' },
   ],
 
@@ -63,7 +92,7 @@ export default definePlugin<AgendaState>({
         const event = nextEvent(state, now.getTime())
         if (!event) {
           return (
-            <Tile label="日程">
+            <Tile label="日程" fit>
               <div className="fd-muted" style={{ fontSize: 'clamp(12px, 1.8vmin, 20px)' }}>
                 接下来没有安排
               </div>
@@ -76,6 +105,7 @@ export default definePlugin<AgendaState>({
           <Tile
             label="日程"
             active={soon}
+            fit
             foot={[dayLabel(event.start, now.getTime()), event.location].filter(Boolean).join(' · ')}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.4vmin', minWidth: 0 }}>
@@ -120,11 +150,11 @@ export default definePlugin<AgendaState>({
           .filter((e) => (e.end ?? e.start) > now.getTime() && e.start < cutoff)
           .slice(0, Math.max(2, span.rows * 2))
         return (
-          <Tile label="接下来">
+          <Tile label="接下来" fit={items.length > 0}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(8px, 1.4vmin, 18px)' }}>
               {items.length === 0 && (
                 <div className="fd-muted" style={{ fontSize: 'clamp(12px, 1.6vmin, 18px)' }}>
-                  接下来没有安排
+                  暂无日程
                 </div>
               )}
               {items.map((event) => (

@@ -24,7 +24,7 @@ const hasTrack = (s: MediaState) => Boolean(s.title)
 /** 没歌时统一的占位，免得每张卡各写一遍 */
 function Idle({ label }: { label: string }) {
   return (
-    <Tile label={label}>
+    <Tile label={label} fit>
       <div className="fd-muted" style={{ fontSize: 'clamp(12px, 1.6vmin, 18px)', letterSpacing: '0.2em' }}>
         没有正在播放的内容
       </div>
@@ -281,7 +281,7 @@ export default definePlugin<MediaState>({
         const lines = parseLyrics(state.lyricsTtml)
         if (lines.length === 0) {
           return (
-            <Tile label="歌词">
+            <Tile label="歌词" fit>
               <div className="fd-muted" style={{ fontSize: 'clamp(12px, 1.8vmin, 20px)' }}>
                 暂无歌词
               </div>

@@ -74,6 +74,9 @@ importers:
       lunisolar:
         specifier: ^2.6.0
         version: 2.6.0
+      node-ical:
+        specifier: ^0.27.1
+        version: 0.27.1
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -1615,6 +1618,10 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
+  node-ical@0.27.1:
+    resolution: {integrity: sha512-5fiKuh/h2HrWKzFt20LtRQdjtjdGfijGfDnCfdAEc++SFX9gA6sa7xwj7/BJmRfWtW/NJWBenN4tOJhg0vM3pg==}
+    engines: {node: '>=22'}
+
   object-inspect@1.13.4:
     resolution: {integrity: sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew==}
     engines: {node: '>= 0.4'}
@@ -1705,6 +1712,9 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
+  rrule-temporal@2.2.1:
+    resolution: {integrity: sha512-/I6cGlsTw5fF5f98v6A1iONamelQEYSTn1m36nG/Ds/+JCm9+udVqs+mx0Jxmn/YFuDuQowJuE8oSHBYepa5Vw==}
+
   rxjs@7.8.2:
     resolution: {integrity: sha512-dhKf903U/PQZY6boNNtAGdWbG85WAbjT/1xYoZIC7FAY0yWapOBQVsVrDl58W86//e1VpMNBtRV4MaXfdMySFA==}
 
@@ -1763,6 +1773,15 @@ packages:
   tapable@2.3.3:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
+
+  temporal-polyfill@1.0.4:
+    resolution: {integrity: sha512-MLEU0qOD2uXlz24oINNtdLZQl8RgmMxSnRtKEGZGGetTJjlRwQJjk+VsJ4EREaUoiaTb8NJOcUiKtoAiWn9EBg==}
+
+  temporal-spec@1.0.1:
+    resolution: {integrity: sha512-wxVoanmDeavXie1vu2JaQ3WIc3JZnWAOYFBsJyATaVsXsycKYUflGsyBmrRSnoCpZJpwPyr38VpgSUlQ8CbFxg==}
+
+  temporal-utils@1.0.2:
+    resolution: {integrity: sha512-1B8Dl4KzrOvsNUlpoWGno2VLQlxroLjDgc5NBjVC9ax9ymdo+ezfyvhyjEMx+IVfhINr6CIG2gcnlP95iRrybQ==}
 
   tinyglobby@0.2.17:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
@@ -3184,6 +3203,11 @@ snapshots:
 
   nanoid@3.3.18: {}
 
+  node-ical@0.27.1:
+    dependencies:
+      rrule-temporal: 2.2.1
+      temporal-polyfill: 1.0.4
+
   object-inspect@1.13.4: {}
 
   pako@2.2.0: {}
@@ -3274,6 +3298,10 @@ snapshots:
       '@rolldown/binding-win32-arm64-msvc': 1.2.4
       '@rolldown/binding-win32-x64-msvc': 1.2.4
 
+  rrule-temporal@2.2.1:
+    dependencies:
+      temporal-spec: 1.0.1
+
   rxjs@7.8.2:
     dependencies:
       tslib: 2.8.1
@@ -3335,6 +3363,15 @@ snapshots:
   tailwindcss@4.3.3: {}
 
   tapable@2.3.3: {}
+
+  temporal-polyfill@1.0.4:
+    dependencies:
+      temporal-spec: 1.0.1
+      temporal-utils: 1.0.2
+
+  temporal-spec@1.0.1: {}
+
+  temporal-utils@1.0.2: {}
 
   tinyglobby@0.2.17:
     dependencies:
