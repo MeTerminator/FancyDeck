@@ -39,7 +39,7 @@ export const lineText = (line: LyricLine | undefined) =>
  * 一行在屏幕上的三个阶段。
  *
  * 歌词卡片本身是交给 AMLL 的 <LyricPlayer> 画的，用不到这个；
- * 这套分镜留给「完整播放器」那格取当前行，以及 AMLL 起不来时的纯文本兜底。
+ * 这套分镜留给 AMLL 起不来时的纯文本兜底。
  */
 export type LinePhase = 'in' | 'singing' | 'out'
 
@@ -62,7 +62,7 @@ export type StagedLine = {
  *          │  进场（占位，在格子里上浮） │      在唱          │  退场（离开排版，浮层里飘走）│
  *
  * 全部由时间算出来，不留组件状态：暂停时画面停在该停的地方，
- * 拖进度条跳过去也不会残留上一处的动画。
+ * 时间跳变时也不会残留上一处的动画。
  */
 export function stageLines(
   lines: LyricLine[],

@@ -88,6 +88,9 @@ const RENAMED_PLUGINS: Record<string, string> = { clock: 'datetime', almanac: 'd
 const RENAMED_CARDS: Record<string, string> = {
   'weather:current': 'weather:compact',
   'datetime:date': 'datetime:date-weekday',
+  'media:controls': 'media:info',
+  'media:cover-controls': 'media:info',
+  'media:full': 'media:info',
 }
 const REMOVED_CARDS = new Set(['datetime:almanac', 'datetime:weekday'])
 const REMOVED_PLUGINS = new Set(['home'])

@@ -293,68 +293,6 @@
   background: var(--fd-accent);
 }
 
-/* ── 进度条 ──────────────────────────────────────────────── */
-
-.fd-progress {
-  display: flex;
-  align-items: center;
-  height: 18px;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-
-.fd-progress__track {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 3px;
-  background: var(--fd-track);
-}
-
-.fd-progress__fill {
-  height: 3px;
-  background: var(--fd-accent);
-}
-
-.fd-progress__knob {
-  flex-shrink: 0;
-  width: 13px;
-  height: 13px;
-  margin-left: -6px;
-  border-radius: 50%;
-  background: var(--fd-accent);
-}
-
-/* ── 控件 ────────────────────────────────────────────────── */
-
-.fd-control {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--fd-text-primary);
-  cursor: pointer;
-}
-
-.fd-control--primary {
-  min-width: 56px;
-  min-height: 56px;
-  border: 1px solid var(--fd-line);
-}
-
-.fd-control:focus-visible {
-  outline: 2px solid var(--fd-accent);
-  outline-offset: 2px;
-}
-
 .fd-tile--button {
   width: 100%;
   height: 100%;

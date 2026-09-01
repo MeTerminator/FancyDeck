@@ -17,7 +17,7 @@
 /** 插件 id，全局唯一，只允许 [a-z0-9-] */
 export type PluginId = string
 
-/** 卡片全局键：`插件id:卡片id`，例如 `media:cover-controls` */
+/** 卡片全局键：`插件id:卡片id`，例如 `media:info` */
 export type CardKey = string
 
 /** 触发器全局键：`插件id:触发器id`，例如 `media:playing` */
@@ -92,7 +92,7 @@ export function withParamDefaults(specs: ParamSpec[] | undefined, values: ParamV
 // 卡片
 // ────────────────────────────────────────────────────────────────────────────
 
-/** 卡片拿到的一切。插件卡片是纯函数式的：读 state，发 command。 */
+/** 卡片拿到的一切。插件卡片是纯函数式的：读取 state 与布局信息。 */
 export type CardContext<S = unknown> = {
   /** 该插件当前的数据快照（服务端下发 + 客户端本地源合并后的结果） */
   state: S
@@ -102,8 +102,6 @@ export type CardContext<S = unknown> = {
   span: { cols: number; rows: number }
   /** 当前生效的布局预设 id */
   presetId: string
-  /** 向插件服务端发指令（例如暂停播放）。不保证送达，失败静默。 */
-  command: (action: string, payload?: unknown) => void
   /** 本地 patch 插件数据（乐观更新，随后会被服务端下发覆盖） */
   patchState: (patch: Partial<S>) => void
   now: Date
@@ -234,19 +232,13 @@ export type ServerMessage =
   | { type: 'hello'; config: DeckConfig; states: PluginStates; serverTime: number }
   | { type: 'config'; config: DeckConfig }
   | { type: 'state'; plugin: PluginId; state: unknown }
-  /** 服务端转给「采集端」（macOS 助手）的指令 */
-  | { type: 'command'; plugin: PluginId; action: string; payload?: unknown }
   | { type: 'error'; message: string }
 
 export type ClientMessage =
   /** 展示页/后台连上来 */
   | { type: 'subscribe'; role: 'display' | 'console' }
-  /** 采集端连上来，声明自己负责哪些插件 */
-  | { type: 'register-agent'; plugins: PluginId[] }
   /** 后台整份写配置 */
   | { type: 'set-config'; config: DeckConfig }
   /** 采集端上报数据 */
   | { type: 'push-state'; plugin: PluginId; state: unknown; merge?: boolean }
-  /** 展示页发指令，服务端转发给采集端 */
-  | { type: 'command'; plugin: PluginId; action: string; payload?: unknown }
   | { type: 'ping' }

@@ -22,26 +22,6 @@ const store = new ConfigStore()
 const hub = new Hub()
 
 // ────────────────────────────────────────────────────────────────────────────
-// 采集端注册表：macOS 助手之类的进程连上来，声明自己能伺候哪些插件
-// ────────────────────────────────────────────────────────────────────────────
-
-type Agent = { socket: WebSocket; plugins: Set<PluginId> }
-const agents = new Set<Agent>()
-
-function dispatchToAgents(plugin: PluginId, action: string, payload?: unknown): boolean {
-  const message: ServerMessage = { type: 'command', plugin, action, payload }
-  const text = JSON.stringify(message)
-  let delivered = false
-  for (const agent of agents) {
-    if (!agent.plugins.has(plugin)) continue
-    if (agent.socket.readyState !== agent.socket.OPEN) continue
-    agent.socket.send(text)
-    delivered = true
-  }
-  return delivered
-}
-
-// ────────────────────────────────────────────────────────────────────────────
 // 挂载插件
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -56,7 +36,6 @@ function makeContext(plugin: ServerPlugin<any>): ServerPluginContext<any> {
       hub.set(plugin.id, typeof next === 'function' ? (next as (p: unknown) => unknown)(hub.get(plugin.id)) : next),
     patchState: (patch) => hub.patch(plugin.id, patch as Record<string, unknown>),
     getSettings: () => store.get().plugins[plugin.id]?.settings ?? {},
-    dispatchToAgents: (action, payload) => dispatchToAgents(plugin.id, action, payload),
     log: (...args) => console.log(`[${plugin.id}]`, ...args),
   }
 }
@@ -138,37 +117,16 @@ api.post('/p/:plugin/state', async (c) => {
   return c.json({ ok: true })
 })
 
-api.post('/p/:plugin/command/:action', async (c) => {
-  const id = c.req.param('plugin')
-  const action = c.req.param('action')
-  const payload = await c.req.json().catch(() => undefined)
-  return c.json({ ok: runCommand(id, action, payload) })
-})
-
 api.get('/status', (c) =>
   c.json({
     plugins: [...registry.keys()].map((id) => ({
       id,
       lastPushAt: hub.touchedAt(id) ?? null,
-      agents: [...agents].filter((a) => a.plugins.has(id)).length,
     })),
     displays: displayCount,
-    agents: agents.size,
     uptimeSec: Math.round(process.uptime()),
   }),
 )
-
-function runCommand(plugin: PluginId, action: string, payload: unknown): boolean {
-  const entry = registry.get(plugin)
-  if (!entry) return false
-  const handler = entry.plugin.commands?.[action]
-  if (handler) {
-    handler(entry.ctx, payload)
-    return true
-  }
-  // 插件没声明这个指令就直接透传给采集端
-  return dispatchToAgents(plugin, action, payload)
-}
 
 // ────────────────────────────────────────────────────────────────────────────
 // 静态资源：生产模式下同一个端口顺带把前端发出去
@@ -236,16 +194,9 @@ function attachPluginSocket(
   entry: { plugin: ServerPlugin<any>; ctx: ServerPluginContext<any> },
   ws: WebSocket,
 ) {
-  const conn = {
-    send: (data: unknown) => {
-      if (ws.readyState === ws.OPEN) ws.send(typeof data === 'string' ? data : JSON.stringify(data))
-    },
-    close: () => ws.close(),
-  }
-
   let handlers
   try {
-    handlers = entry.plugin.socket?.(entry.ctx, conn) ?? {}
+    handlers = entry.plugin.socket?.(entry.ctx) ?? {}
   } catch (error) {
     console.error(`[${entry.plugin.id}] socket 接入出错：`, error)
     ws.close()
@@ -280,7 +231,6 @@ function attachPluginSocket(
 
 wss.on('connection', (socket) => {
   let unsubscribe: (() => void) | null = null
-  let agent: Agent | null = null
   let counted = false
 
   const send = (message: ServerMessage) => {
@@ -308,12 +258,6 @@ wss.on('connection', (socket) => {
         }
         break
       }
-      case 'register-agent': {
-        agent = { socket, plugins: new Set(message.plugins ?? []) }
-        agents.add(agent)
-        console.log(`[fancydeck] 采集端接入：${[...agent.plugins].join(', ') || '(未声明)'}`)
-        break
-      }
       case 'push-state': {
         if (!registry.has(message.plugin)) return
         if (message.merge === false) hub.set(message.plugin, message.state)
@@ -324,10 +268,6 @@ wss.on('connection', (socket) => {
         applyConfig(message.config)
         break
       }
-      case 'command': {
-        runCommand(message.plugin, message.action, message.payload)
-        break
-      }
       case 'ping':
         break
     }
@@ -335,7 +275,6 @@ wss.on('connection', (socket) => {
 
   socket.on('close', () => {
     unsubscribe?.()
-    if (agent) agents.delete(agent)
     if (counted) displayCount -= 1
   })
 })

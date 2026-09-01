@@ -36,7 +36,6 @@ export type Runtime = {
   env: EvalEnv
   /** 后台改配置：本地立刻生效 + 推给服务端广播给其它端 */
   setConfig: (next: DeckConfig | ((prev: DeckConfig) => DeckConfig)) => void
-  command: (plugin: PluginId, action: string, payload?: unknown) => void
   /** 卡片本地乐观更新 */
   patchState: (plugin: PluginId, patch: Record<string, unknown>) => void
   /** 后台预览用：忽略实际屏幕方向，按指定方向算布局 */
@@ -207,10 +206,6 @@ export function RuntimeProvider({
     })
   }, [])
 
-  const command = useCallback((plugin: PluginId, action: string, payload?: unknown) => {
-    connectionRef.current?.send({ type: 'command', plugin, action, payload })
-  }, [])
-
   const patchState = useCallback((plugin: PluginId, patch: Record<string, unknown>) => {
     setServerStates((prev) => ({ ...prev, [plugin]: { ...(prev[plugin] as object), ...patch } }))
   }, [])
@@ -225,11 +220,10 @@ export function RuntimeProvider({
       resolution: held,
       env,
       setConfig,
-      command,
       patchState,
       previewOrientation: setPreview,
     }),
-    [status, config, states, now, orientation, preview, held, env, setConfig, command, patchState],
+    [status, config, states, now, orientation, preview, held, env, setConfig, patchState],
   )
 
   return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>

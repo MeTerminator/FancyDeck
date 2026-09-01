@@ -52,7 +52,6 @@ export function CardHost({ slot, presetId }: { slot: Slot; presetId: string }) {
     span: { cols: slot.colSpan, rows: slot.rowSpan },
     presetId,
     now: runtime.now,
-    command: (action, payload) => runtime.command(plugin.id, action, payload),
     patchState: (patch) => runtime.patchState(plugin.id, patch as Record<string, unknown>),
   }
 

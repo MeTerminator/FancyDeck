@@ -76,7 +76,7 @@ server/            数据服务
 | | 在哪 | 管什么 | 认不认识对方 |
 |---|---|---|---|
 | 前端半边 | `src/plugins/<id>/index.tsx` | 卡片长什么样、暴露哪些触发条件、有哪些设置 | 不 import 服务端 |
-| 服务端半边 | `server/plugins/<id>.ts` | 注册路由、收数据、转发指令 | 不 import React |
+| 服务端半边 | `server/plugins/<id>.ts` | 注册路由、接收数据、维护状态 | 不 import React |
 | 共用 | `src/plugins/<id>/state.ts` | 这个插件的数据长什么样 | 两边都 import 它 |
 
 两半只靠 `id` 和 state 的形状对齐。插件可以只有前端半边（时间与日期几乎就是），
@@ -84,17 +84,15 @@ server/            数据服务
 
 ### 一个插件能提供多张卡片
 
-这是「媒体控制」的样子——同一份数据，五种摆法，后台随便挑：
+这是「媒体展示」的样子——同一份数据，三种只读卡片，后台随便挑：
 
 ```
 media:cover           封面
 media:lyrics          歌词
-media:controls        播放控制
-media:cover-controls  封面 + 控制
-media:full            完整播放器
+media:info            歌曲信息
 ```
 
-它们读的是同一个 `MediaState`，所以拆开摆在屏幕两头和合起来摆在一格里，永远是同步的。
+它们读的是同一个 `MediaState`，只展示播放器上报的数据，不提供播放、切歌或跳转进度控制。
 
 ### 歌词：TTML + AMLL
 
@@ -137,9 +135,6 @@ media:full            完整播放器
 
 `itunes:timing` 给 `Word` 是逐字，`Line` 是整行。每个 `<span>` 一个词，
 `<p>` 上的 `begin`/`end` 是整行的起止。
-
-`lyrics.ts` 里还留了一套 `stageLines`（按时间算此刻在唱哪几行），
-但它不参与歌词卡片的渲染——只服务于「完整播放器」那格取当前行，和上面的纯文本兜底。
 
 ### 农历
 
@@ -315,7 +310,7 @@ type CardContext<S> = {
     { id: 's1', card: 'media:cover',    col: 1, row: 1, colSpan: 2, rowSpan: 2 },
     { id: 's2', card: 'media:lyrics',   col: 3, row: 1, colSpan: 2, rowSpan: 2 },
     { id: 's3', card: 'datetime:time',  col: 1, row: 3, colSpan: 2, rowSpan: 1 },
-    { id: 's4', card: 'media:controls', col: 3, row: 3, colSpan: 2, rowSpan: 1 },
+    { id: 's4', card: 'media:info',     col: 3, row: 3, colSpan: 2, rowSpan: 1 },
   ],
   orientation: 'landscape',
   when: { kind: 'trigger', ref: 'media:playing' },
@@ -382,13 +377,6 @@ curl -X POST localhost:8787/api/p/media/now-playing \
 
 没写专属路由的插件也能用通用口：`POST /api/p/<id>/state`（加 `?merge=0` 整份替换）。
 
-采集端还可以用 WebSocket 接进来，声明自己负责哪些插件，
-这样才能收到展示页发过来的指令（暂停、切歌、拖进度）：
-
-```js
-socket.send(JSON.stringify({ type: 'register-agent', plugins: ['media', 'agenda'] }))
-```
-
 ### 插件自己的 WebSocket 端点
 
 插件可以实现 `socket()`，框架就会把 `/ws/p/<插件id>` 上的连接交给它——
@@ -403,8 +391,6 @@ ws://<host>/ws/p/media
   → { "type": "lyrics",   "ttml": "<tt …>" }
   → { "type": "progress", "positionSec": 12.3, "playing": true }
   → { "type": "stop" }
-  ← { "type": "ok",      "action": "play" }
-  ← { "type": "command", "action": "toggle" | "next" | "prev" | "seek", "payload": … }
 
 连上并发过 play 即视为在播；发 stop、或者连接一断，即视为停止。
 ```
@@ -416,22 +402,6 @@ ws://<host>/ws/p/media
 `progress` 一到就算「在播」（`playing` 可省），停止之后再来一条也能把播放接回来；
 要报暂停就显式带上 `playing: false`。客户端对 `progress` 做了 **0.3 秒防抖**——
 屏幕自己会补齐两次上报之间的进度，发太密既不更准也不更快。
-
-### 控制是「先报后改」的
-
-屏幕上点播放/暂停、上下一曲、拖进度，走的是反方向那条 `command`：
-
-```
-卡片 command('seek', {positionSec}) → 服务端 → WS 下发给播放器
-                                          ↓
-                          播放器执行，用 progress 把新读数报回来
-                                          ↓
-                                    屏幕这才跟着动
-```
-
-展示页**不做乐观更新**。进度条与歌词等播放器确认后才移动，
-所以屏幕上显示的永远是播放器的真实位置，而不是「我以为点了会怎样」。
-播放器要是压根控制不了（比如下面那个只读数据源），屏幕就原地不动——这也是对的。
 
 ### 停止立刻退，暂停才有宽限
 

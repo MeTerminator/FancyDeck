@@ -1,6 +1,5 @@
 import {
   defineServerPlugin,
-  type PluginSocketConn,
   type ServerPluginContext,
 } from '../core/plugin'
 import { emptyMedia, type MediaState } from '../../src/plugins/media/state'
@@ -15,7 +14,7 @@ import { emptyMedia, type MediaState } from '../../src/plugins/media/state'
  *   HTTP  POST /api/p/media/now-playing   一次一报，适合快捷指令、cron
  *   WS    ws://<host>/ws/p/media          长连接，适合播放器实时上报
  *
- * WebSocket 那条把「还在播吗」这件事交给连接本身：连上并发过 play
+ * WebSocket 那条把「还在播吗」这件事交给连接本身：连上并上报 play
  * 就算在播，发 stop 或者连接一断就算停了。播放器崩了、网断了，
  * 屏幕上不会继续挂着一首根本没在响的歌。
  */
@@ -60,21 +59,6 @@ const markPaused = (prev: MediaState, next: Partial<MediaState>): Partial<MediaS
 
 /** 停止：立刻退出，不走宽限 */
 const STOPPED: Partial<MediaState> = { playing: false, pausedAt: 0 }
-
-/**
- * 当前那条上报连接。展示页点的播放/暂停/切歌/拖进度要发给它。
- * 插件在一个进程里只有一份，所以放模块级——socket() 与 commands 都要够得着。
- */
-let controller: PluginSocketConn | null = null
-
-/** 优先发给长连接的播放器；没有就回落到老的采集端通道 */
-const dispatch = (ctx: ServerPluginContext<MediaState>, action: string, payload?: unknown) => {
-  if (controller) {
-    controller.send({ type: 'command', action, payload })
-    return true
-  }
-  return ctx.dispatchToAgents(action, payload)
-}
 
 export default defineServerPlugin<MediaState>({
   id: 'media',
@@ -122,16 +106,13 @@ export default defineServerPlugin<MediaState>({
    *   → { "type": "progress", "positionSec": 12.3 }  对齐进度，可选
    *   → { "type": "lyrics",   "ttml": "<tt>…" }      单独送歌词
    *   → { "type": "stop" }                            停止
-   *   ← { "type": "ok", "action": "play" }            每条消息的回执
    *
    * 断开连接等同于 stop。
    */
-  socket(ctx, conn) {
+  socket(ctx) {
     // 同时接了好几个播放器时，以最后一个发 play 的为准；
     // 其余连接断开不该把正在播的那个也停掉。
     let owning = false
-    controller = conn
-
     // owning 表示「这条连接是当前在驱动播放的那个」。停止不交出所有权——
     // 上游随时可能又放起来，那时来的 progress 得认，不然会被当成野消息丢掉。
     // 真正交出去是在连接关闭的时候。
@@ -139,8 +120,6 @@ export default defineServerPlugin<MediaState>({
       if (!owning) return
       ctx.setState((prev) => ({ ...prev, ...STOPPED, updatedAt: Date.now() }))
     }
-
-    conn.send({ type: 'hello', plugin: 'media' })
 
     return {
       message(data) {
@@ -191,36 +170,16 @@ export default defineServerPlugin<MediaState>({
             break
           }
           default:
-            conn.send({ type: 'error', message: `未知消息类型 ${String(message.type)}` })
             return
         }
-        conn.send({ type: 'ok', action: message.type })
       },
 
       // 播放器掉线就当停了——这正是用长连接的理由
       close() {
-        if (controller === conn) controller = null
         // 断开等同于停止：立刻退回主布局，不走暂停宽限
         stop()
         owning = false
       },
     }
-  },
-
-  /**
-   * 展示页上点的播放/暂停/切歌/拖进度，服务端自己做不了，转给播放器。
-   *
-   * 这里**只转发，不改 state**。屏幕上的进度与歌词要等播放器真的执行完、
-   * 把新读数报回来才动——显示的始终是播放器的真实状态，
-   * 而不是「我以为点了会怎样」。播放器要是控制不了（比如只读的数据源），
-   * 屏幕就原地不动，这也是对的。
-   */
-  commands: {
-    toggle: (ctx) => dispatch(ctx, 'toggle'),
-    play: (ctx) => dispatch(ctx, 'play'),
-    pause: (ctx) => dispatch(ctx, 'pause'),
-    next: (ctx) => dispatch(ctx, 'next'),
-    prev: (ctx) => dispatch(ctx, 'prev'),
-    seek: (ctx, payload) => dispatch(ctx, 'seek', payload),
   },
 })

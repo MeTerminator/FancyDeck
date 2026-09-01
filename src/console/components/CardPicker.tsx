@@ -12,7 +12,7 @@ import { pluginIcon } from './Shell'
 
 /**
  * 卡片选择框。列出所有已安装插件提供的卡片，
- * 放不进当前选区的（比如「封面+控制」至少要 2 格宽）会标灰并给出原因。
+ * 放不进当前选区的卡片会标灰并给出原因。
  */
 export function CardPicker({
   open,
