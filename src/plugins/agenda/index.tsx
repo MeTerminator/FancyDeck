@@ -1,5 +1,6 @@
 import { definePlugin } from '../../core/plugin'
 import { Tile } from '../../ui/Tile'
+import { Marquee } from '../../ui/Marquee'
 import { emptyAgenda, minutesUntil, nextEvent, type AgendaEvent, type AgendaState } from './state'
 
 /**
@@ -14,27 +15,19 @@ const hhmm = (ms: number) => {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
 
-function dayLabel(start: number, now: number): string {
-  const a = new Date(start)
-  const b = new Date(now)
+function eventTimeLabel(event: AgendaEvent, now: number): string {
+  const start = new Date(event.start)
+  const current = new Date(now)
   const days = Math.round(
-    (new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime() -
-      new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime()) /
+    (new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime() -
+      new Date(current.getFullYear(), current.getMonth(), current.getDate()).getTime()) /
       86_400_000,
   )
-  if (days === 0) return '今日'
-  if (days === 1) return '明日'
-  if (days === -1) return '昨日'
-  return `${a.getMonth() + 1}月${a.getDate()}日`
-}
-
-function countdown(event: AgendaEvent, now: number): string {
-  const minutes = minutesUntil(event, now)
-  if (minutes < -1) return '进行中'
-  if (minutes < 1) return '即将开始'
-  if (minutes < 60) return `${Math.round(minutes)} 分钟后`
-  if (minutes < 24 * 60) return `${Math.round(minutes / 60)} 小时后`
-  return dayLabel(event.start, now)
+  const time = event.allDay ? '全天' : hhmm(event.start)
+  if (days === 0) return time
+  if (days === 1) return `${time} 明日`
+  if (days === 2) return `${time} 后天`
+  return `${time} ${pad2(start.getMonth() + 1)}/${pad2(start.getDate())}`
 }
 
 export default definePlugin<AgendaState>({
@@ -86,7 +79,7 @@ export default definePlugin<AgendaState>({
     {
       id: 'next',
       name: '下一件事',
-      description: '时间 + 标题 + 地点，会随格子变大而变大',
+      description: '标题、地点、时间依次展示，会随格子变大而变大',
       size: { minCols: 1, minRows: 1, defaultCols: 1, defaultRows: 1 },
       render: ({ state, now, span }) => {
         const event = nextEvent(state, now.getTime())
@@ -99,40 +92,41 @@ export default definePlugin<AgendaState>({
             </Tile>
           )
         }
-        const soon = minutesUntil(event, now.getTime()) <= 30
+        const soon = (event.start - now.getTime()) / 60_000 <= 30
         const big = span.cols >= 2 && span.rows >= 2
         return (
           <Tile
-            label="日程"
             active={soon}
             fit
-            foot={[dayLabel(event.start, now.getTime()), event.location].filter(Boolean).join(' · ')}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.4vmin', minWidth: 0 }}>
               <div className="fd-row">
                 <div
-                  className="fd-display"
-                  style={{ fontSize: big ? 'clamp(48px, 11vmin, 150px)' : 'clamp(28px, 6vmin, 80px)' }}
+                  className="fd-heading"
+                  style={{
+                    fontSize: big ? 'clamp(28px, 5vmin, 68px)' : 'clamp(18px, 3.4vmin, 42px)',
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitBoxOrient: 'vertical',
+                    WebkitLineClamp: 2,
+                  }}
                 >
-                  {event.allDay ? '全天' : hhmm(event.start)}
+                  {event.title}
                 </div>
                 {soon && <div className="fd-dot" />}
               </div>
-              <div
-                className="fd-heading fd-secondary"
+              <Marquee
+                className="fd-secondary"
                 style={{
-                  fontSize: big ? 'clamp(18px, 3.4vmin, 44px)' : 'clamp(14px, 2.2vmin, 28px)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
+                  fontSize: big ? 'clamp(18px, 3vmin, 40px)' : 'clamp(14px, 2.2vmin, 28px)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {event.title}
+                {event.location || '未设置地点'}
+              </Marquee>
+              <div className="fd-display" style={{ fontSize: big ? 'clamp(20px, 3.6vmin, 48px)' : 'clamp(16px, 2.6vmin, 32px)' }}>
+                {eventTimeLabel(event, now.getTime())}
               </div>
-              {big && (
-                <div className="fd-accent" style={{ fontSize: 'clamp(12px, 1.8vmin, 22px)', letterSpacing: '0.2em' }}>
-                  {countdown(event, now.getTime())}
-                </div>
-              )}
             </div>
           </Tile>
         )

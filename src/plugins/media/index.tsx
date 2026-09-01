@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
+import { type MouseEvent } from 'react'
 import { definePlugin } from '../../core/plugin'
 import type { CardContext } from '../../core/types'
 import { duration } from '../../data/format'
 import { useTheme } from '../../theme/ThemeProvider'
 import { AlbumCover, NextIcon, PauseIcon, PlayIcon, PrevIcon } from '../../ui/icons'
 import { Tile } from '../../ui/Tile'
+import { Marquee } from '../../ui/Marquee'
 import { emptyMedia, livePosition, type MediaState } from './state'
 import { lineText, parseLyrics, stageLines } from './lyrics'
 import { LyricsView } from './LyricsView'
@@ -140,50 +141,6 @@ const ellipsis = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'no
  *
  * 溢出与否只量第一份内容的宽度，和滚不滚没有关系，所以不会自己把自己量抖。
  */
-function Marquee({ children, className, style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
-  const box = useRef<HTMLDivElement>(null)
-  const unit = useRef<HTMLSpanElement>(null)
-  const [overflow, setOverflow] = useState(0)
-
-  useEffect(() => {
-    const outer = box.current
-    const inner = unit.current
-    if (!outer || !inner) return
-    const measure = () => setOverflow(Math.max(0, inner.offsetWidth - outer.clientWidth))
-    measure()
-    // 格子改大小、换歌换成更长的曲名，都要重新判断一次
-    const observer = new ResizeObserver(measure)
-    observer.observe(outer)
-    observer.observe(inner)
-    return () => observer.disconnect()
-  }, [])
-
-  const scrolling = overflow > 1
-  const content = <span className="fd-marquee__unit">{children}</span>
-
-  return (
-    <div
-      ref={box}
-      className={['fd-marquee', scrolling ? 'fd-marquee--scroll' : '', className].filter(Boolean).join(' ')}
-      // 长的走得久一点，不然短的一晃而过、长的拖半天
-      style={{ ...style, ['--fd-marquee-duration' as string]: `${Math.max(8, overflow / 26)}s` }}
-    >
-      <div className="fd-marquee__track">
-        <span ref={unit} className="fd-marquee__unit">
-          {children}
-        </span>
-        {scrolling && (
-          <>
-            <span className="fd-marquee__gap" />
-            <span aria-hidden>{content}</span>
-            <span className="fd-marquee__gap" />
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function TrackTitle({
   state,
   size = 2.6,
