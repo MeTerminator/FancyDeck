@@ -123,17 +123,14 @@
 }
 
 .fd-tile__label {
-  flex-shrink: 0;
+  position: absolute;
+  right: clamp(16px, 2.6vmin, 34px);
+  bottom: clamp(16px, 2.6vmin, 34px);
+  z-index: 1;
+  pointer-events: none;
   color: var(--fd-text-muted);
   font-size: clamp(10px, 1.15vmin, 13px);
   letter-spacing: 0.3em;
-  /*
-   * 往上提一截，贴近格子上沿。
-   * 格位标签本来就是「贴边的小字」，留和正文一样宽的内边距会显得头重；
-   * 提上去之后中间那块内容区也能多拿一点高度。
-   * 这里减掉的是 .fd-tile padding 的一半，两边跟着同一个 clamp 走。
-   */
-  margin-top: calc(clamp(16px, 2.6vmin, 34px) / -2);
 }
 
 .fd-tile__body {
@@ -176,11 +173,6 @@
 
 .fd-tile__fit .fd-tile__body {
   flex: 0 1 auto;
-}
-
-/* 自动放大后负边距也会被同比放大，短内容卡会把标签推到卡片外。 */
-.fd-tile__fit .fd-tile__label {
-  margin-top: 0;
 }
 
 /* ── 跑马灯 ──────────────────────────────────────────────── */

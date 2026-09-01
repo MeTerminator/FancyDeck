@@ -53,7 +53,11 @@ export class ConfigStore {
 function load(): DeckConfig {
   try {
     const raw = readFileSync(FILE, 'utf8')
-    return normalize(migrate(JSON.parse(raw) as DeckConfig))
+    const input = JSON.parse(raw) as DeckConfig
+    const config = normalize(migrate(input))
+    // 卸载或改名后的配置也要立即落盘，避免旧插件设置和卡片引用残留。
+    if (JSON.stringify(input) !== JSON.stringify(config)) persist(config)
+    return config
   } catch {
     const fresh = defaultConfig()
     persist(fresh)
@@ -81,8 +85,16 @@ function persist(config: DeckConfig) {
  * 读盘时改写成 datetime:*，用户已经摆好的布局不会因为改名就空一格。
  */
 const RENAMED_PLUGINS: Record<string, string> = { clock: 'datetime', almanac: 'datetime' }
+const RENAMED_CARDS: Record<string, string> = {
+  'weather:current': 'weather:compact',
+  'datetime:date': 'datetime:date-weekday',
+}
+const REMOVED_CARDS = new Set(['datetime:almanac', 'datetime:weekday'])
+const REMOVED_PLUGINS = new Set(['home'])
 
 const renameKey = (key: string): string => {
+  const renamedCard = RENAMED_CARDS[key]
+  if (renamedCard) return renamedCard
   const i = key.indexOf(':')
   if (i < 0) return key
   const next = RENAMED_PLUGINS[key.slice(0, i)]
@@ -103,10 +115,33 @@ const renameCondition = (when: Condition): Condition => {
   }
 }
 
+/** 删除已卸载插件的触发器引用，并保留其余条件的逻辑。 */
+const removeDeletedCondition = (when: Condition): Condition | null => {
+  switch (when?.kind) {
+    case 'trigger':
+      return REMOVED_PLUGINS.has(when.ref.split(':', 1)[0]) ? null : when
+    case 'all': {
+      const of = (when.of ?? []).map(removeDeletedCondition).filter((item): item is Condition => item !== null)
+      return of.length === 0 ? { kind: 'always' } : { ...when, of }
+    }
+    case 'any': {
+      const of = (when.of ?? []).map(removeDeletedCondition).filter((item): item is Condition => item !== null)
+      return of.length === 0 ? { kind: 'never' } : { ...when, of }
+    }
+    case 'not': {
+      const of = removeDeletedCondition(when.of)
+      return of === null ? { kind: 'always' } : { ...when, of }
+    }
+    default:
+      return when
+  }
+}
+
 function migrate(input: DeckConfig): DeckConfig {
   const plugins: Record<string, PluginConfig> = {}
   for (const [id, entry] of Object.entries(input?.plugins ?? {})) {
     const target = RENAMED_PLUGINS[id] ?? id
+    if (REMOVED_PLUGINS.has(target)) continue
     const prev = plugins[target]
     plugins[target] = prev
       ? // 两个老插件并成一个：设置合并，任一开着就算开着
@@ -119,8 +154,12 @@ function migrate(input: DeckConfig): DeckConfig {
     plugins,
     presets: (input?.presets ?? []).map((preset) => ({
       ...preset,
-      slots: (preset.slots ?? []).map((slot) => ({ ...slot, card: renameKey(slot.card) })),
-      when: renameCondition(preset.when),
+      slots: (preset.slots ?? [])
+        .map((slot) => ({ ...slot, card: renameKey(slot.card) }))
+        .filter(
+          (slot) => !REMOVED_PLUGINS.has(slot.card.split(':', 1)[0]) && !REMOVED_CARDS.has(slot.card),
+        ),
+      when: removeDeletedCondition(renameCondition(preset.when)) ?? { kind: 'never' },
     })),
   }
 }

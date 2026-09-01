@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { AutoFit } from './AutoFit'
 
 export type TileProps = {
-  /** 左上角的格位标签 */
+  /** 右下角浮在内容上的格位标签 */
   label?: ReactNode
   /** 底部一行补充信息 */
   foot?: ReactNode
@@ -17,7 +17,8 @@ export type TileProps = {
 }
 
 /**
- * 所有格子的外壳：只负责底色、圆角、内边距与「标签 / 内容 / 脚注」三段结构。
+ * 所有格子的外壳：只负责底色、圆角、内边距与「内容 / 脚注」结构；
+ * 标签独立绝对定位在右下角，不参与内容尺寸计算。
  * 具体格子只关心自己的内容。
  */
 export function Tile({ label, foot, active, onClick, style, fit = false, children }: TileProps) {
@@ -27,7 +28,6 @@ export function Tile({ label, foot, active, onClick, style, fit = false, childre
 
   const sections = (
     <>
-      {label !== undefined && <div className="fd-tile__label">{label}</div>}
       <div className="fd-tile__body">{children}</div>
       {foot !== undefined && <div className="fd-tile__foot">{foot}</div>}
     </>
@@ -38,6 +38,7 @@ export function Tile({ label, foot, active, onClick, style, fit = false, childre
     return (
       <button type="button" className={className} style={style} onClick={onClick}>
         {content}
+        {label !== undefined && <div className="fd-tile__label">{label}</div>}
       </button>
     )
   }
@@ -45,6 +46,7 @@ export function Tile({ label, foot, active, onClick, style, fit = false, childre
   return (
     <div className={className} style={style}>
       {content}
+      {label !== undefined && <div className="fd-tile__label">{label}</div>}
     </div>
   )
 }

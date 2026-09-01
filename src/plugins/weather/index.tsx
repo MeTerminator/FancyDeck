@@ -1,5 +1,5 @@
 import { definePlugin } from '../../core/plugin'
-import { SunIcon } from '../../ui/icons'
+import { DropletIcon, SunIcon } from '../../ui/icons'
 import { Tile } from '../../ui/Tile'
 import { defaultWeather, type WeatherState } from './state'
 
@@ -49,67 +49,31 @@ export default definePlugin<WeatherState>({
 
   cards: [
     {
-      id: 'current',
-      name: '当前天气',
-      description: '温度、天气状况与湿度',
-      size: { minCols: 1, minRows: 1, defaultCols: 1, defaultRows: 1 },
-      render: ({ state: w }) => (
-        <Tile
-          label="天气"
-          fit
-          foot={[`${w.city} · ${w.low}° / ${w.high}°`, w.aqi > 0 ? `AQI ${w.aqi} ${w.aqiLevel}` : '']
-            .filter(Boolean)
-            .join(' · ')}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.8vmin' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 1.4vmin, 18px)' }}>
-              <SunIcon size="clamp(20px, 3vmin, 38px)" color="var(--fd-accent)" />
-              <span className="fd-heading" style={{ fontSize: 'clamp(15px, 2.3vmin, 28px)' }}>
-                {w.condition}
-              </span>
-            </div>
-            <div className="fd-row">
-              <span className="fd-display" style={{ fontSize: 'clamp(40px, 8.6vmin, 116px)' }}>
-                {Math.round(w.temperature)}
-              </span>
-              <span className="fd-display fd-secondary" style={{ fontSize: 'clamp(18px, 3.8vmin, 52px)' }}>
-                °
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1vmin' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <span className="fd-muted" style={{ fontSize: 'clamp(10px, 1.3vmin, 14px)' }}>
-                  湿度
-                </span>
-                <span className="fd-display" style={{ fontSize: 'clamp(15px, 2.2vmin, 28px)' }}>
-                  {w.humidity}%
-                </span>
-              </div>
-              <div className="fd-bar">
-                <div className="fd-bar__fill" style={{ width: `${w.humidity}%` }} />
-              </div>
-              <div className="fd-secondary" style={{ fontSize: 'clamp(10px, 1.3vmin, 14px)' }}>
-                体感 {Math.round(w.feelsLike)}°
-              </div>
-            </div>
-          </div>
-        </Tile>
-      ),
-    },
-    {
       id: 'compact',
-      name: '天气（紧凑）',
-      description: '只有温度和状况，适合塞进 1×1 的角落',
+      name: '天气',
+      description: '第一行显示温度和天气状况，第二行显示湿度',
       size: { minCols: 1, minRows: 1, defaultCols: 1, defaultRows: 1 },
       render: ({ state: w }) => (
         <Tile label={w.city} fit>
-          <div className="fd-row">
-            <span className="fd-display" style={{ fontSize: 'clamp(32px, 7vmin, 92px)' }}>
-              {Math.round(w.temperature)}°
-            </span>
-            <span className="fd-heading fd-secondary" style={{ fontSize: 'clamp(13px, 2vmin, 24px)' }}>
-              {w.condition}
-            </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2vmin' }}>
+            <div className="fd-row">
+              <span
+                className="fd-display"
+                style={{ fontSize: 'clamp(32px, 7vmin, 92px)', lineHeight: 1, paddingInlineEnd: '0.14em' }}
+              >
+                {Math.round(w.temperature)}°
+              </span>
+              <span className="fd-heading fd-secondary" style={{ fontSize: 'clamp(13px, 2vmin, 24px)' }}>
+                {w.condition}
+              </span>
+              <SunIcon size="clamp(16px, 2.4vmin, 30px)" color="var(--fd-accent)" />
+            </div>
+            <div className="fd-row">
+              <DropletIcon size="clamp(14px, 2vmin, 24px)" color="var(--fd-text-muted)" />
+              <span className="fd-heading fd-secondary" style={{ fontSize: 'clamp(13px, 2vmin, 24px)' }}>
+                湿度 {w.humidity}%
+              </span>
+            </div>
           </div>
         </Tile>
       ),
