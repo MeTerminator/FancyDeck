@@ -39,7 +39,7 @@ function trackPatch(payload: PlayPayload): Partial<MediaState> {
   if (payload.positionSec !== undefined) patch.positionSec = num(payload.positionSec)
   if (payload.artwork !== undefined) patch.artwork = payload.artwork === null ? null : str(payload.artwork)
   if (payload.app !== undefined) patch.app = payload.app === null ? null : str(payload.app)
-  if (payload.lyricsTtml !== undefined) patch.lyricsTtml = str(payload.lyricsTtml)
+  if (payload.lyricsLrc !== undefined) patch.lyricsLrc = str(payload.lyricsLrc)
   return patch
 }
 
@@ -76,8 +76,8 @@ export default defineServerPlugin<MediaState>({
         ...prev,
         ...markPaused(prev, body),
         // 换歌了却没带新歌词，就把旧的清掉，免得张冠李戴
-        lyricsTtml:
-          body.lyricsTtml ?? (body.title && body.title !== prev.title ? '' : prev.lyricsTtml),
+        lyricsLrc:
+          body.lyricsLrc ?? (body.title && body.title !== prev.title ? '' : prev.lyricsLrc),
         positionAt: now,
         updatedAt: now,
       }))
@@ -86,8 +86,8 @@ export default defineServerPlugin<MediaState>({
 
     /** 歌词单独一条路，因为它通常来自另一个数据源 */
     app.post('/lyrics', async (c) => {
-      const body = (await c.req.json().catch(() => ({}))) as { ttml?: string }
-      ctx.patchState({ lyricsTtml: str(body.ttml), updatedAt: Date.now() })
+      const body = (await c.req.json().catch(() => ({}))) as { lrc?: string }
+      ctx.patchState({ lyricsLrc: str(body.lrc), updatedAt: Date.now() })
       return c.json({ ok: true })
     })
 
@@ -104,7 +104,7 @@ export default defineServerPlugin<MediaState>({
    *
    *   → { "type": "play",     ...歌曲字段 }   开始播放（也用来换歌）
    *   → { "type": "progress", "positionSec": 12.3 }  对齐进度，可选
-   *   → { "type": "lyrics",   "ttml": "<tt>…" }      单独送歌词
+   *   → { "type": "lyrics",   "lrc": "[00:01.00]…" } 单独送歌词
    *   → { "type": "stop" }                            停止
    *
    * 断开连接等同于 stop。
@@ -124,7 +124,7 @@ export default defineServerPlugin<MediaState>({
     return {
       message(data) {
         if (typeof data !== 'object' || data === null) return
-        const message = data as PlayPayload & { type?: string; ttml?: string; playing?: boolean }
+        const message = data as PlayPayload & { type?: string; lrc?: string; playing?: boolean }
         const now = Date.now()
 
         switch (message.type) {
@@ -134,9 +134,9 @@ export default defineServerPlugin<MediaState>({
             ctx.setState((prev) => ({
               ...prev,
               ...patch,
-              lyricsTtml:
-                patch.lyricsTtml ??
-                (patch.title && patch.title !== prev.title ? '' : prev.lyricsTtml),
+              lyricsLrc:
+                patch.lyricsLrc ??
+                (patch.title && patch.title !== prev.title ? '' : prev.lyricsLrc),
               positionSec: patch.positionSec ?? 0,
               playing: true,
               pausedAt: 0,
@@ -162,7 +162,7 @@ export default defineServerPlugin<MediaState>({
             break
           }
           case 'lyrics': {
-            ctx.patchState({ lyricsTtml: str(message.ttml), updatedAt: now })
+            ctx.patchState({ lyricsLrc: str(message.lrc), updatedAt: now })
             break
           }
           case 'stop': {

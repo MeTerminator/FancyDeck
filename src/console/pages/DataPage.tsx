@@ -29,15 +29,13 @@ const DEMO_TRACK = {
   durationSec: 304,
   positionSec: 34,
   app: 'Music',
-  lyrics: [
-    { at: 0, text: '收音机在讲明天的雨' },
-    { at: 16, text: '把城市的边缘开成一条河' },
-    { at: 34, text: '晚风把信号灯吹成橘色的雨' },
-    { at: 52, text: '我们在末班车里数完了海' },
-    { at: 70, text: '你说别急，天亮还有很久' },
-    { at: 92, text: '路灯一盏一盏地退回去' },
-    { at: 114, text: '剩下的路我记得怎么走' },
-  ],
+  lyricsLrc: `[00:00.00]收音机在讲明天的雨
+[00:00.00]The radio is talking about tomorrow's rain
+[00:16.00]把城市的边缘开成一条河
+[00:34.00]晚风把信号灯吹成橘色的雨
+[00:34.00]The evening wind turns the lights into orange rain
+[00:52.00]我们在末班车里数完了海
+[01:10.00]你说别急，天亮还有很久`,
 }
 
 export function DataPage() {

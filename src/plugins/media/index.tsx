@@ -55,7 +55,7 @@ export default definePlugin<MediaState>({
 
   routes: [
     { method: 'POST', path: '/api/p/media/now-playing', description: '上报当前曲目与播放状态' },
-    { method: 'POST', path: '/api/p/media/lyrics', description: '上报歌词（TTML 原文）' },
+    { method: 'POST', path: '/api/p/media/lyrics', description: '上报歌词（LRC 原文）' },
     { method: 'POST', path: '/api/p/media/stopped', description: '标记为已停止' },
     { method: 'GET', path: '/api/p/media/state', description: '读当前状态' },
     {
@@ -110,11 +110,11 @@ export default definePlugin<MediaState>({
     {
       id: 'lyrics',
       name: '歌词',
-      description: '只显示当前这一行，随播放逐字点亮',
+      description: '只显示一条当前 LRC 歌词及其可选翻译',
       size: { minCols: 1, minRows: 1, defaultCols: 2, defaultRows: 2 },
       render: ({ state, now }) => {
         if (!hasTrack(state)) return <Idle label="歌词" />
-        const lines = parseLyrics(state.lyricsTtml)
+        const lines = parseLyrics(state.lyricsLrc)
         if (lines.length === 0) {
           return (
             <Tile label="歌词" fit>

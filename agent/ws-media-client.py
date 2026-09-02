@@ -25,8 +25,7 @@
 先在 MeT-Music 里打开「设置 → 外部 API」；里面还有个单独的 WebSocket 开关，
 开了就走事件推送，没开自动退回轮询 /api/now-playing。
 
-歌词转成 TTML（逐字时间轴）发给 FancyDeck。每个 <p> 必须带 itunes:key，
-AMLL 的解析器没有它会整行跳过。
+歌词转成行级 LRC 发给 FancyDeck；翻译用与正文相同的时间戳紧跟在下一行。
 
 依赖：pip install websockets
 """
@@ -39,7 +38,6 @@ import time
 from functools import partial
 from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
-from xml.sax.saxutils import escape
 
 try:
     import websockets
@@ -91,16 +89,6 @@ def stamp(seconds: float) -> str:
     return f"{int(seconds // 60):02d}:{seconds % 60:06.3f}"
 
 
-def wrap_ttml(body: str, *, timing: str) -> str:
-    return (
-        '<tt xmlns="http://www.w3.org/ns/ttml" '
-        'xmlns:ttm="http://www.w3.org/ns/ttml#metadata" '
-        f'xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="{timing}">\n'
-        '  <head><metadata><ttm:agent type="person" xml:id="v1"/></metadata></head>\n'
-        f"  <body>\n    <div>\n{body}\n    </div>\n  </body>\n</tt>"
-    )
-
-
 def lyrics_fingerprint(payload: dict) -> str:
     """
     一份歌词的指纹。
@@ -118,18 +106,18 @@ def lyrics_fingerprint(payload: dict) -> str:
     ))
 
 
-def lyrics_to_ttml(payload: dict) -> tuple[str, str]:
+def lyrics_to_lrc(payload: dict) -> tuple[str, str]:
     """
-    GET /api/lyrics 的解析结果 → TTML。返回 (ttml, 来源说明)。
+    GET /api/lyrics 的解析结果 → 行级 LRC。返回 (lrc, 来源说明)。
 
-    接口已经把歌词拆好了，这边只是换个封装：
+    接口已经把歌词拆好了，这边只保留每行的开始时间：
 
-        source=yrc   逐字，line.words 每个词一个 span，AMLL 会扫着点亮
-        source=lrc   只有行级时间轴，整行一个 span，一起点亮
+        source=yrc   丢弃逐字时间，合并成一行
+        source=lrc   直接保留行级时间轴
         source=none  没歌词
 
-    line.tran（翻译）挂成 ttm:role="x-translation" 的 span，AMLL 认这个角色；
-    它不需要时间轴，跟着所在的那行走。
+    line.tran（翻译）使用与正文相同的时间戳紧跟在下一行。FancyDeck 将同时间戳
+    的第二条文本合并为该行的可选翻译，这仍是普通 LRC 阅读器能识别的格式。
     """
     lines = payload.get("lines") or []
     source = str(payload.get("source") or "none")
@@ -139,47 +127,33 @@ def lyrics_to_ttml(payload: dict) -> tuple[str, str]:
     # offset 是客户端里那个歌词偏移设置。按 LRC 的老规矩正值表示提前，
     # 所以是减不是加。要是方向反了，用 --offset 往回补一点就行。
     shift = float(payload.get("offset") or 0) / 1000
-    word_level = source == "yrc"
-
     parts = []
-    for index, line in enumerate(lines):
+    translated = 0
+    for line in lines:
         content = str(line.get("content") or "")
         words = line.get("words") or []
-        if not content.strip() and not words:
+        if not content.strip() and words:
+            content = "".join(str(word.get("content") or "") for word in words)
+        content = content.strip()
+        if not content:
             continue
 
         begin = float(line.get("time") or 0) / 1000 - shift
-        end = float(line.get("endTime") or 0) / 1000 - shift
-        # 末行常常没有 endTime，给个 4 秒收尾，免得 begin>=end 让整行被丢掉
-        if end <= begin:
-            end = begin + 4.0
-
-        if word_level and words:
-            spans = "".join(
-                f'<span begin="{stamp(float(word.get("start") or 0) / 1000 - shift)}"'
-                f' end="{stamp(float(word.get("end") or 0) / 1000 - shift)}">'
-                f'{escape(str(word.get("content") or ""))}</span>'
-                for word in words
-            )
-        else:
-            spans = f'<span begin="{stamp(begin)}" end="{stamp(end)}">{escape(content)}</span>'
+        timestamp = f"[{stamp(begin)}]"
+        parts.append(f"{timestamp}{content.replace(chr(10), ' ').replace(chr(13), ' ')}")
 
         tran = str(line.get("tran") or "").strip()
-        if tran:
-            spans += f'<span ttm:role="x-translation">{escape(tran)}</span>'
-
-        parts.append(
-            f'      <p itunes:key="L{index + 1}" begin="{stamp(begin)}"'
-            f' end="{stamp(end)}" ttm:agent="v1">{spans}</p>'
-        )
+        if tran and tran != content:
+            parts.append(f"{timestamp}{tran.replace(chr(10), ' ').replace(chr(13), ' ')}")
+            translated += 1
 
     if not parts:
         return "", "没有歌词"
 
-    note = f"{source}（{'逐字' if word_level else '行级'}）"
+    note = f"{source} → LRC（{len(lines)} 条，{translated} 条翻译）"
     if shift:
         note += f"，偏移 {shift * 1000:.0f}ms"
-    return wrap_ttml("\n".join(parts), timing="Word" if word_level else "Line"), note
+    return "\n".join(parts), note
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -216,8 +190,8 @@ class FancyDeckLink:
         self._last_progress = time.monotonic()
         await self.send({"type": "play", **track, "positionSec": round(position, 2)})
 
-    async def lyrics(self, ttml: str):
-        await self.send({"type": "lyrics", "ttml": ttml})
+    async def lyrics(self, lrc: str):
+        await self.send({"type": "lyrics", "lrc": lrc})
 
     async def progress(self, position: float, *, force: bool = False, **extra) -> bool:
         """
@@ -281,7 +255,7 @@ class MetMusicSource:
         self.retired = False
         # 当前曲目与它的歌词。让出屏幕之后重新播放要把这两样再发一遍。
         self.track: dict = {}
-        self.ttml = ""
+        self.lrc = ""
         self._lyric_fingerprint = ""
         self._lyric_task: asyncio.Task | None = None
 
@@ -353,7 +327,7 @@ class MetMusicSource:
             "durationSec": float(snapshot.get("duration") or 0) / 1000,
             "app": "MeT-Music",
         }
-        self.ttml = ""
+        self.lrc = ""
         if playing:
             await self.link.play(self.track, position)
             print(f"\n→ play  {self.track['title']} — {self.track['artist']}"
@@ -406,14 +380,14 @@ class MetMusicSource:
     async def _publish_lyrics(self, mid: str, payload: dict, fingerprint: str):
         if self.mid != mid:  # 等的这会儿又换歌了，这份作废
             return
-        ttml, origin = lyrics_to_ttml(payload)
-        self.ttml = ttml
+        lrc, origin = lyrics_to_lrc(payload)
+        self.lrc = lrc
         self._lyric_fingerprint = fingerprint
         # 屏幕上没这首歌的时候先存着，等 _resume 占回屏幕时一起发
         if not self.retired:
-            await self.link.lyrics(ttml)
-        count = ttml.count("<p ")
-        print(f"→ lyrics  {count} 行，{len(ttml)} 字节 —— {origin}" if count else f"→ lyrics  {origin}")
+            await self.link.lyrics(lrc)
+        count = sum(1 for line in payload.get("lines") or [] if str(line.get("content") or "").strip() or line.get("words"))
+        print(f"→ lyrics  {count} 行，{len(lrc)} 字节 —— {origin}" if count else f"→ lyrics  {origin}")
 
     # ── 状态 ────────────────────────────────────────────────────────────
     async def _apply(self, patch: dict, *, force: bool = False):
@@ -456,7 +430,7 @@ class MetMusicSource:
             # 暂停太久让出去的屏幕，得重新占回来：曲目和歌词都再发一遍
             await self.link.play(self.track, position)
             # 歌词一并重发（这首没歌词就是空串），免得屏幕上留着别人的
-            await self.link.lyrics(self.ttml)
+            await self.link.lyrics(self.lrc)
             print(f"\n→ 重新开播  {self.track['title']}  {position:.1f}s")
         else:
             await self.link.progress(position, playing=True, force=True)
@@ -496,7 +470,7 @@ class MetMusicSource:
         self.retired = False
         self.mid = ""
         self.track = {}
-        self.ttml = ""
+        self.lrc = ""
         self._lyric_fingerprint = ""
         self.snapshot = {}
         if announce:
@@ -677,7 +651,7 @@ async def run(url: str, source: MetMusicSource):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="把 MeT-Music 正在放的歌上报给 FancyDeck 媒体插件（含 TTML 歌词）")
+        description="把 MeT-Music 正在放的歌上报给 FancyDeck 媒体插件（含 LRC 歌词）")
     parser.add_argument("--url", default=DEFAULT_URL, help=f"FancyDeck 的 WS 地址，默认 {DEFAULT_URL}")
     parser.add_argument("--met-host", default=MET_HOST, help=f"MeT-Music 所在主机，默认 {MET_HOST}")
     parser.add_argument("--met-port", type=int, default=MET_PORT, help=f"外部 API 端口，默认 {MET_PORT}")

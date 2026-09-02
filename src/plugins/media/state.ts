@@ -13,11 +13,10 @@ export type MediaState = {
   /** 封面图 URL，可以是 data: */
   artwork: string | null
   /**
-   * 歌词，TTML 原文（逐字时间轴）。空串表示这首歌没有歌词。
-   * 服务端只负责搬运，不解析——解析在展示页用 AMLL 的 parseTTML 做，
-   * 解出来的结构正好就是它的播放器要吃的那一份，中间不必再转一道。
+   * 歌词，LRC 原文（行级时间轴）。空串表示这首歌没有歌词。
+   * 同时间戳的第一条是正文、第二条是可选翻译；服务端只负责搬运。
    */
-  lyricsTtml: string
+  lyricsLrc: string
   /** 来源应用，例如 Music / Spotify */
   app: string | null
   /**
@@ -39,7 +38,7 @@ export const emptyMedia: MediaState = {
   positionSec: 0,
   positionAt: 0,
   artwork: null,
-  lyricsTtml: '',
+  lyricsLrc: '',
   app: null,
   pausedAt: 0,
   updatedAt: 0,

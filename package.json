@@ -16,9 +16,6 @@
     "check:lunar": "tsx scripts/check-lunar.ts"
   },
   "dependencies": {
-    "@applemusic-like-lyrics/core": "^0.5.2",
-    "@applemusic-like-lyrics/lyric": "^1.0.2",
-    "@applemusic-like-lyrics/react": "^0.5.2",
     "@hono/node-server": "^2.1.1",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",

@@ -94,47 +94,25 @@ media:info            歌曲信息
 
 它们读的是同一个 `MediaState`，只展示播放器上报的数据，不提供播放、切歌或跳转进度控制。
 
-### 歌词：TTML + AMLL
+### 歌词：LRC
 
-歌词走 **TTML**（逐字时间轴），`MediaState` 里就存一份原文字符串，服务端只负责搬运。
-解析与渲染都在展示页，用 [AMLL](https://github.com/amll-dev/applemusic-like-lyrics)：
+歌词使用行级 **LRC**，`MediaState.lyricsLrc` 保存原文，服务端只负责搬运字符串，
+展示端不依赖第三方歌词解析器。卡片在任意时刻只渲染一个歌词条目：正文一条，
+以及一条可选翻译。
 
-| 包 | 干什么 |
-|---|---|
-| `@applemusic-like-lyrics/lyric` | `parseTTML` 解析逐字时间轴，连 `isBG`、`isDuet` 一起给 |
-| `@applemusic-like-lyrics/react` | `<LyricPlayer>` 渲染 |
+同步翻译使用常见的同时间戳双行写法，第一条作为正文、紧随的第二条作为翻译：
 
-**整首歌词都交给 `<LyricPlayer>`**，由它按 `currentTime` 自己决定显示哪几行。
-并行的对唱、背景和声、进退场的上浮与模糊，都是它本来就会做的事——
-拦着只喂一行反而把这些全关掉了（这个弯路走过，别再走）。
-
-`LyricsView.tsx` 只做三件外围的事，播放器本身的行为一概不拦：
-
-1. **懒加载** —— AMLL 压缩后一百多 KB，没摆歌词卡片就不下载
-2. **量格子定字号** —— 它默认按视口算（`5vh`/`2.5vw`），跟这块格子多大无关。
-   摆件上格子常常只占屏幕一小块，所以量出实际尺寸后写进 `--amll-lp-font-size`，
-   按「高度容得下三行左右」定，并行三行时也不溢出
-3. **兜底** —— 加载中或在无头环境里起不来时退回纯文本，歌词照样看得见
-
-一个坑：**AMLL 的解析器要求每个 `<p>` 带 `itunes:key`**，没有会整行跳过——
-不报错，直接给你 0 行。最小可用的一段长这样：
-
-```xml
-<tt xmlns="http://www.w3.org/ns/ttml"
-    xmlns:ttm="http://www.w3.org/ns/ttml#metadata"
-    xmlns:itunes="http://music.apple.com/lyric-ttml-internal"
-    itunes:timing="Word">
-  <head><metadata><ttm:agent type="person" xml:id="v1"/></metadata></head>
-  <body><div>
-    <p itunes:key="L1" begin="00:00.000" end="00:03.000" ttm:agent="v1"
-      ><span begin="00:00.000" end="00:01.500">第一行</span
-      ><span begin="00:01.500" end="00:03.000">分两段</span></p>
-  </div></body>
-</tt>
+```lrc
+[ar:棱镜合唱团]
+[ti:晚风与信号灯]
+[00:16.00]把城市的边缘开成一条河
+[00:34.00]晚风把信号灯吹成橘色的雨
+[00:34.00]The evening wind turns the lights into orange rain
+[00:52.00]我们在末班车里数完了海
 ```
 
-`itunes:timing` 给 `Word` 是逐字，`Line` 是整行。每个 `<span>` 一个词，
-`<p>` 上的 `begin`/`end` 是整行的起止。
+解析器支持百分秒或毫秒时间戳、一行多个时间戳和 `[offset:+/-毫秒]`。歌词正文与
+翻译一起交给通用 `AutoFit`，会按卡片真实宽高尽量放大，并在溢出前缩小。
 
 ### 农历
 
@@ -388,7 +366,7 @@ curl -X POST localhost:8787/api/p/media/now-playing \
 ws://<host>/ws/p/media
 
   → { "type": "play",     "title": "…", "artist": "…", "durationSec": 260 }
-  → { "type": "lyrics",   "ttml": "<tt …>" }
+  → { "type": "lyrics",   "lrc": "[00:12.30]歌词…" }
   → { "type": "progress", "positionSec": 12.3, "playing": true }
   → { "type": "stop" }
 
@@ -425,13 +403,9 @@ ws://<host>/ws/p/media
 
 ### 歌词从哪来
 
-播放器上报 TTML 就直接用。手上只有别的格式时，在上报端转一道再发——
-服务端不认识歌词格式，它只搬运字符串。
-
-QRC（QQ 音乐的逐字格式）转 TTML 可以照抄 AMLL 的 `parseQrc` 规则：
-行头 `[起点,时长]`，其后每个词跟一个 `(起点,时长)`（毫秒，词的时间是绝对值），
-整行被圆括号裹住即为背景和声。行级的 LRC 也能转，只是每行只有一个时间点，
-出来就是整行一起点亮而不是逐字扫过去——这是源数据的上限，不是显示端的。
+播放器直接上报 LRC，服务端不解析，只搬运字符串。仓库本地的
+`agent/ws-media-client.py` 会把 MeT-Music `/api/lyrics` 返回的 YRC/LRC 统一降为
+行级 LRC；`line.tran` 会写成同时间戳的第二行，供卡片显示翻译。
 
 
 ### 也有自己去取数的插件
