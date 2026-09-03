@@ -110,7 +110,7 @@ export default definePlugin<MediaState>({
     {
       id: 'lyrics',
       name: '歌词',
-      description: '只显示一条当前 LRC 歌词及其可选翻译',
+      description: '前奏显示曲名和歌手，开唱后显示当前 LRC 歌词及其可选翻译',
       size: { minCols: 1, minRows: 1, defaultCols: 2, defaultRows: 2 },
       render: ({ state, now }) => {
         if (!hasTrack(state)) return <Idle label="歌词" />
@@ -128,7 +128,13 @@ export default definePlugin<MediaState>({
         return (
           <Tile label="歌词" foot={state.title}>
             <div style={{ width: '100%', height: '100%', minHeight: 0 }}>
-              <LyricsView lines={lines} positionMs={positionMs} playing={state.playing} />
+              <LyricsView
+                lines={lines}
+                positionMs={positionMs}
+                playing={state.playing}
+                title={state.title}
+                artist={state.artist}
+              />
             </div>
           </Tile>
         )

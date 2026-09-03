@@ -47,6 +47,9 @@ export const emptyMedia: MediaState = {
 /** 上报的是某一刻的读数，屏幕上要连续走字，所以本地补上流逝的时间 */
 export function livePosition(state: MediaState, now: number): number {
   if (!state.playing || !state.positionAt) return state.positionSec
-  const drifted = state.positionSec + (now - state.positionAt) / 1000
+  // 新状态可能恰好到在页面时钟两次 tick 之间；此时 now 会短暂早于
+  // positionAt。不能用负的流逝时间把刚收到的进度倒推回上一句歌词。
+  const elapsedMs = Math.max(0, now - state.positionAt)
+  const drifted = state.positionSec + elapsedMs / 1000
   return state.durationSec > 0 ? Math.min(state.durationSec, drifted) : drifted
 }

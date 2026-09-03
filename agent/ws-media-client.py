@@ -79,6 +79,10 @@ LYRIC_RETRY = 0.4
 STOPPED_STATES = ("", "stopped", "idle", "none")
 
 
+class FancyDeckDisconnected(RuntimeError):
+    """发往 FancyDeck 的长连接已经失效，需要重连并恢复完整状态。"""
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # 歌词
 # ════════════════════════════════════════════════════════════════════════════
@@ -168,6 +172,7 @@ class FancyDeckLink:
         self.url = url
         self.ws = None
         self._last_progress = 0.0
+        self._disconnected = asyncio.Event()
 
     async def __aenter__(self):
         self.ws = await websockets.connect(self.url)
@@ -178,13 +183,31 @@ class FancyDeckLink:
         if self.ws:
             await self.ws.close()
 
-    async def send(self, message: dict):
+    async def send(self, message: dict) -> bool:
         if self.ws is None:
-            return
+            self._disconnected.set()
+            return False
         try:
             await self.ws.send(json.dumps(message, ensure_ascii=False))
-        except websockets.ConnectionClosed:
-            pass
+            return True
+        except (websockets.ConnectionClosed, OSError):
+            # 不能静默吞掉：主循环收到信号后会重连，并重新发送 play + LRC。
+            self._disconnected.set()
+            return False
+
+    async def wait_disconnected(self):
+        if self.ws is None:
+            raise FancyDeckDisconnected(self.url)
+
+        flagged = asyncio.create_task(self._disconnected.wait())
+        closed = asyncio.create_task(self.ws.wait_closed())
+        try:
+            await asyncio.wait((flagged, closed), return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            flagged.cancel()
+            closed.cancel()
+            await asyncio.gather(flagged, closed, return_exceptions=True)
+        raise FancyDeckDisconnected(self.url)
 
     async def play(self, track: dict, position: float = 0.0):
         self._last_progress = time.monotonic()
@@ -204,8 +227,7 @@ class FancyDeckLink:
         if not force and now - self._last_progress < PROGRESS_DEBOUNCE:
             return False
         self._last_progress = now
-        await self.send({"type": "progress", "positionSec": round(position, 2), **extra})
-        return True
+        return await self.send({"type": "progress", "positionSec": round(position, 2), **extra})
 
     async def stop(self):
         self._last_progress = 0.0
@@ -607,6 +629,24 @@ class MetMusicSource:
             await asyncio.sleep(POLL_INTERVAL)
 
     # ── 主循环 ──────────────────────────────────────────────────────────
+    async def _transport_loop(self):
+        while True:
+            if self.transport != "poll":
+                connected = await self._run_ws()
+                if connected or self.transport == "ws":
+                    if not connected and not self._ws_warned:
+                        print(f"WebSocket 连不上 {self.ws_url}，3 秒一次地重试")
+                        self._ws_warned = True
+                    await self._mark_stopped()
+                    await asyncio.sleep(3)
+                    continue
+                if not self._ws_warned:
+                    print(f"WebSocket 连不上（客户端里那个开关可能没开），"
+                          f"改用轮询 /api/now-playing，之后每 {WS_RETRY:.0f} 秒回头试一次")
+                    self._ws_warned = True
+
+            await self._poll(None if self.transport == "poll" else WS_RETRY)
+
     async def run(self, link: FancyDeckLink):
         self.link = link
 
@@ -616,37 +656,46 @@ class MetMusicSource:
         else:
             print(f"⚠ 连不上 {self.base}，先在 MeT-Music 里打开「设置 → 外部 API」；这边会一直重试")
 
-        watchdog = asyncio.create_task(self._watchdog())
-        try:
-            while True:
-                if self.transport != "poll":
-                    connected = await self._run_ws()
-                    if connected or self.transport == "ws":
-                        if not connected and not self._ws_warned:
-                            print(f"WebSocket 连不上 {self.ws_url}，3 秒一次地重试")
-                            self._ws_warned = True
-                        await self._mark_stopped()
-                        await asyncio.sleep(3)
-                        continue
-                    if not self._ws_warned:
-                        print(f"WebSocket 连不上（客户端里那个开关可能没开），"
-                              f"改用轮询 /api/now-playing，之后每 {WS_RETRY:.0f} 秒回头试一次")
-                        self._ws_warned = True
+        # FancyDeck 重连后，服务端把它视为一条没有所有权的新连接。把当前屏幕状态
+        # 标成已让出，再用全量快照触发 play + LRC，不能只接着发会被忽略的 progress。
+        if self.mid:
+            self.retired = True
+        snapshot = await self._api("/now-playing")
+        if snapshot:
+            await self._apply(snapshot, force=True)
 
-                await self._poll(None if self.transport == "poll" else WS_RETRY)
+        watchdog = asyncio.create_task(self._watchdog())
+        transport = asyncio.create_task(self._transport_loop())
+        disconnected = asyncio.create_task(link.wait_disconnected())
+        tasks = [watchdog, transport, disconnected]
+        try:
+            done, _ = await asyncio.wait(tasks[1:], return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                await task
         finally:
-            watchdog.cancel()
             if self._lyric_task:
                 self._lyric_task.cancel()
+                tasks.append(self._lyric_task)
+                self._lyric_task = None
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 # ════════════════════════════════════════════════════════════════════════════
 
 
 async def run(url: str, source: MetMusicSource):
-    link = FancyDeckLink(url)
-    async with link:
-        await source.run(link)
+    while True:
+        try:
+            link = FancyDeckLink(url)
+            async with link:
+                await source.run(link)
+        except FancyDeckDisconnected:
+            print(f"\nFancyDeck 连接已失效，3 秒后重连并恢复当前歌曲与歌词")
+        except (OSError, WebSocketException) as error:
+            print(f"\n连不上 FancyDeck {url}（{error}），3 秒后重试")
+        await asyncio.sleep(3)
 
 
 def main():
