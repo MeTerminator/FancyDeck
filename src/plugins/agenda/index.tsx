@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { definePlugin } from '../../core/plugin'
 import { Tile } from '../../ui/Tile'
 import { Marquee } from '../../ui/Marquee'
@@ -15,19 +16,152 @@ const hhmm = (ms: number) => {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
 
-function eventTimeLabel(event: AgendaEvent, now: number): string {
+const dayNumber = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000
+
+const durationLabel = (ms: number) => {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`
+}
+
+function eventDateTimeLabel(event: AgendaEvent, now: number): string {
   const start = new Date(event.start)
   const current = new Date(now)
-  const days = Math.round(
-    (new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime() -
-      new Date(current.getFullYear(), current.getMonth(), current.getDate()).getTime()) /
-      86_400_000,
-  )
+  const days = dayNumber(start) - dayNumber(current)
   const time = event.allDay ? '全天' : hhmm(event.start)
-  if (days === 0) return time
-  if (days === 1) return `${time} 明日`
-  if (days === 2) return `${time} 后天`
-  return `${time} ${pad2(start.getMonth() + 1)}/${pad2(start.getDate())}`
+  if (days === 0) return `今天 ${time}`
+  if (days === 1) return `明天 ${time}`
+  if (days === 2) return `后天 ${time}`
+  return `${pad2(start.getMonth() + 1)}/${pad2(start.getDate())} ${time}`
+}
+
+export function eventTimeStatus(event: AgendaEvent, now: number) {
+  const end = event.end ?? event.start + 30 * 60_000
+  const inProgress = event.start <= now && end > now
+  const dateTime = eventDateTimeLabel(event, now)
+
+  if (inProgress) {
+    const duration = Math.max(1, end - event.start)
+    return {
+      label: `离结束 ${durationLabel(end - now)} · ${dateTime}`,
+      progress: Math.min(1, Math.max(0, (now - event.start) / duration)),
+    }
+  }
+
+  if (dayNumber(new Date(event.start)) === dayNumber(new Date(now)) && event.start > now) {
+    return { label: `离开始 ${durationLabel(event.start - now)} · ${dateTime}`, progress: null }
+  }
+
+  return { label: dateTime, progress: null }
+}
+
+function ProgressRing({ progress }: { progress: number }) {
+  const radius = 8
+  return (
+    <svg className="fd-agenda-progress" viewBox="0 0 20 20" aria-hidden="true">
+      <circle className="fd-agenda-progress__track" cx="10" cy="10" r={radius} />
+      <circle
+        className="fd-agenda-progress__value"
+        cx="10"
+        cy="10"
+        r={radius}
+        pathLength="1"
+        strokeDasharray="1"
+        strokeDashoffset={1 - progress}
+      />
+    </svg>
+  )
+}
+
+const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+function agendaDayLabel(ms: number, now: number) {
+  const date = new Date(ms)
+  const days = dayNumber(date) - dayNumber(new Date(now))
+  const relative = days === 0 ? '今天' : days === 1 ? '明天' : days === 2 ? '后天' : ''
+  const dateLabel = `${date.getMonth() + 1}月${date.getDate()}日`
+  return [relative, dateLabel, weekdays[date.getDay()]].filter(Boolean).join(' · ')
+}
+
+function AgendaListEvent({ event, now }: { event: AgendaEvent; now: number }) {
+  const end = event.end ?? event.start + 30 * 60_000
+  const inProgress = event.start <= now && end > now
+  return (
+    <div className={`fd-agenda-list__event${inProgress ? ' fd-agenda-list__event--active' : ''}`}>
+      <div className="fd-agenda-list__detail">
+        <div className="fd-agenda-list__title">{event.title}</div>
+        {event.location && <div className="fd-agenda-list__location">{event.location}</div>}
+        <div className="fd-agenda-list__times">
+          {event.allDay ? '全天' : `${hhmm(event.start)} - ${hhmm(end)}`}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type AgendaGroup = { day: number; label: string; events: AgendaEvent[] }
+
+function groupAgendaEvents(items: AgendaEvent[], now: number): AgendaGroup[] {
+  return items.reduce<AgendaGroup[]>((result, event) => {
+    const day = dayNumber(new Date(event.start))
+    const current = result.at(-1)
+    if (current?.day === day) current.events.push(event)
+    else result.push({ day, label: agendaDayLabel(event.start, now), events: [event] })
+    return result
+  }, [])
+}
+
+function AgendaListGroups({ groups, now, measuring = false }: { groups: AgendaGroup[]; now: number; measuring?: boolean }) {
+  return groups.map((group) => (
+    <div className="fd-agenda-list__group" key={group.day}>
+      <div className="fd-agenda-list__day">{group.label}</div>
+      <div className="fd-agenda-list__events">
+        {group.events.map((event) => (
+          <div data-agenda-measure={measuring ? '' : undefined} key={event.id}>
+            <AgendaListEvent event={event} now={now} />
+          </div>
+        ))}
+      </div>
+    </div>
+  ))
+}
+
+function AgendaList({ items, now }: { items: AgendaEvent[]; now: number }) {
+  const frameRef = useRef<HTMLDivElement>(null)
+  const [visibleCount, setVisibleCount] = useState(items.length)
+  const itemKey = items.map((event) => `${event.id}:${event.start}:${event.end ?? ''}:${event.title}:${event.location ?? ''}`).join('|')
+
+  useLayoutEffect(() => {
+    const frame = frameRef.current
+    if (!frame) return
+
+    const fit = () => {
+      const frameBottom = frame.getBoundingClientRect().bottom - Number.parseFloat(getComputedStyle(frame).paddingBottom)
+      const measured = [...frame.querySelectorAll<HTMLElement>('[data-agenda-measure]')]
+      const nextCount = measured.filter((element) => element.getBoundingClientRect().bottom <= frameBottom + 0.5).length
+      setVisibleCount(nextCount)
+    }
+
+    const observer = new ResizeObserver(fit)
+    observer.observe(frame)
+    fit()
+    return () => observer.disconnect()
+  }, [itemKey])
+
+  const visibleGroups = groupAgendaEvents(items.slice(0, visibleCount), now)
+  const allGroups = groupAgendaEvents(items, now)
+  return (
+    <div className="fd-agenda-list" ref={frameRef}>
+      <div className="fd-agenda-list__visible">
+        <AgendaListGroups groups={visibleGroups} now={now} />
+      </div>
+      <div className="fd-agenda-list__measure" aria-hidden="true">
+        <AgendaListGroups groups={allGroups} now={now} measuring />
+      </div>
+    </div>
+  )
 }
 
 export default definePlugin<AgendaState>({
@@ -72,7 +206,6 @@ export default definePlugin<AgendaState>({
       step: 1,
       unit: '天',
     },
-    { key: 'lookaheadHours', label: '只看未来', type: 'number', default: 24, min: 1, max: 168, step: 1, unit: '小时' },
   ],
 
   cards: [
@@ -94,6 +227,10 @@ export default definePlugin<AgendaState>({
         }
         const soon = (event.start - now.getTime()) / 60_000 <= 30
         const big = span.cols >= 2 && span.rows >= 2
+        const timeStatus = eventTimeStatus(event, now.getTime())
+        const detailStyle = {
+          fontSize: big ? 'clamp(20px, 3.6vmin, 48px)' : 'clamp(16px, 2.6vmin, 32px)',
+        }
         return (
           <Tile
             active={soon}
@@ -116,16 +253,17 @@ export default definePlugin<AgendaState>({
                 {soon && <div className="fd-dot" />}
               </div>
               <Marquee
-                className="fd-secondary"
+                className="fd-display"
                 style={{
-                  fontSize: big ? 'clamp(18px, 3vmin, 40px)' : 'clamp(14px, 2.2vmin, 28px)',
+                  ...detailStyle,
                   whiteSpace: 'nowrap',
                 }}
               >
                 {event.location || '未设置地点'}
               </Marquee>
-              <div className="fd-display" style={{ fontSize: big ? 'clamp(20px, 3.6vmin, 48px)' : 'clamp(16px, 2.6vmin, 32px)' }}>
-                {eventTimeLabel(event, now.getTime())}
+              <div className="fd-agenda-time fd-display" style={detailStyle}>
+                {timeStatus.progress !== null && <ProgressRing progress={timeStatus.progress} />}
+                <span>{timeStatus.label}</span>
               </div>
             </div>
           </Tile>
@@ -136,40 +274,19 @@ export default definePlugin<AgendaState>({
     {
       id: 'list',
       name: '日程清单',
-      description: '未来几件事排成一列',
+      description: '按日期分组展示未来日程、地点和起止时间',
       size: { minCols: 1, minRows: 2, defaultCols: 1, defaultRows: 2 },
-      render: ({ state, now, settings, span }) => {
-        const cutoff = now.getTime() + Number(settings.lookaheadHours ?? 24) * 3_600_000
+      render: ({ state, now }) => {
         const items = state.events
-          .filter((e) => (e.end ?? e.start) > now.getTime() && e.start < cutoff)
-          .slice(0, Math.max(2, span.rows * 2))
+          .filter((e) => (e.end ?? e.start) > now.getTime())
+          .sort((a, b) => a.start - b.start)
         return (
-          <Tile label="接下来" fit={items.length > 0}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(8px, 1.4vmin, 18px)' }}>
-              {items.length === 0 && (
-                <div className="fd-muted" style={{ fontSize: 'clamp(12px, 1.6vmin, 18px)' }}>
-                  暂无日程
-                </div>
-              )}
-              {items.map((event) => (
-                <div key={event.id} style={{ display: 'flex', gap: '1.4vmin', alignItems: 'baseline', minWidth: 0 }}>
-                  <span className="fd-display" style={{ fontSize: 'clamp(14px, 2vmin, 24px)', flexShrink: 0 }}>
-                    {event.allDay ? '全天' : hhmm(event.start)}
-                  </span>
-                  <span
-                    className="fd-heading fd-secondary"
-                    style={{
-                      fontSize: 'clamp(12px, 1.8vmin, 22px)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {event.title}
-                  </span>
-                </div>
-              ))}
-            </div>
+          <Tile label="接下来">
+            {items.length > 0 ? (
+              <AgendaList items={items} now={now.getTime()} />
+            ) : (
+              <div className="fd-muted" style={{ fontSize: 'clamp(12px, 1.6vmin, 18px)' }}>暂无日程</div>
+            )}
           </Tile>
         )
       },

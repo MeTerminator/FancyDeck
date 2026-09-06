@@ -339,6 +339,145 @@
   color: var(--fd-text-secondary);
 }
 
+/* ── 日程 ────────────────────────────────────────────────── */
+
+.fd-agenda-time {
+  display: flex;
+  align-items: center;
+  gap: 0.38em;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.fd-agenda-progress {
+  width: 0.78em;
+  height: 0.78em;
+  flex: 0 0 auto;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+
+.fd-agenda-progress circle {
+  fill: none;
+  stroke-width: 2.2;
+}
+
+.fd-agenda-progress__track {
+  stroke: var(--fd-track);
+}
+
+.fd-agenda-progress__value {
+  stroke: var(--fd-accent);
+  stroke-linecap: round;
+}
+
+.fd-agenda-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  padding-bottom: clamp(18px, 2.4vmin, 30px);
+  overflow: hidden;
+}
+
+.fd-agenda-list__visible,
+.fd-agenda-list__measure {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1.7vmin, 24px);
+  min-width: 0;
+}
+
+.fd-agenda-list__measure {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.fd-agenda-list__group {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(5px, 0.7vmin, 10px);
+  min-width: 0;
+}
+
+.fd-agenda-list__day {
+  color: var(--fd-text-secondary);
+  font-family: var(--fd-font-text);
+  font-size: clamp(22px, 3vmin, 30px);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.fd-agenda-list__events {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-top: 1px solid var(--fd-line);
+}
+
+.fd-agenda-list__event {
+  position: relative;
+  min-width: 0;
+  padding: clamp(12px, 1.6vmin, 20px) 0 clamp(12px, 1.6vmin, 20px) clamp(10px, 1.3vmin, 16px);
+  border-bottom: 1px solid var(--fd-line);
+}
+
+.fd-agenda-list__event::before {
+  position: absolute;
+  top: 18%;
+  bottom: 18%;
+  left: 0;
+  width: 2px;
+  background: var(--fd-line);
+  content: '';
+}
+
+.fd-agenda-list__event--active::before {
+  background: var(--fd-accent);
+}
+
+.fd-agenda-list__detail {
+  min-width: 0;
+}
+
+.fd-agenda-list__title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--fd-text-primary);
+  font-family: var(--fd-font-heading);
+  font-size: clamp(26px, 3.5vmin, 36px);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.fd-agenda-list__location {
+  margin-top: 0.28em;
+  overflow: hidden;
+  color: var(--fd-text-secondary);
+  font-family: var(--fd-font-text);
+  font-size: clamp(22px, 3vmin, 30px);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fd-agenda-list__times {
+  margin-top: 0.35em;
+  color: var(--fd-text-secondary);
+  font-family: var(--fd-font-display);
+  font-size: clamp(22px, 3vmin, 30px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 300;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .fd-accent {
   color: var(--fd-accent);
 }

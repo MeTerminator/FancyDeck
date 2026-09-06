@@ -87,7 +87,7 @@ export default definePlugin<DateTimeState>({
                   </div>
                 )}
               </div>
-              {span.rows > 1 && (
+              {/* {span.rows > 1 && (
                 <>
                   <div className="fd-rule" style={{ width: 'clamp(80px, 13vmin, 180px)' }} />
                   <div
@@ -97,7 +97,7 @@ export default definePlugin<DateTimeState>({
                     {greeting(now)}
                   </div>
                 </>
-              )}
+              )} */}
             </div>
           </Tile>
         )
@@ -167,6 +167,7 @@ export default definePlugin<DateTimeState>({
                 {lunar.yearPillar}年{lunar.monthPillar}月
               </div>
               <div>{lunar.dayPillar}日</div>
+              <div>{lunar.zodiac}年</div>
             </div>
             {footParts.map((part) => (
               <div key={part}>{part}</div>
@@ -184,19 +185,6 @@ export default definePlugin<DateTimeState>({
               minWidth: 0,
             }}
           >
-            <div
-              className="fd-heading fd-muted"
-              style={{
-                position: 'absolute',
-                top: compact ? 'clamp(10px, 1.35vmin, 18px)' : 'clamp(16px, 2.6vmin, 34px)',
-                left: compact ? 'clamp(10px, 1.35vmin, 18px)' : 'clamp(16px, 2.6vmin, 34px)',
-                fontSize: detailFontSize,
-                letterSpacing: '0.04em',
-                lineHeight: 1.2,
-              }}
-            >
-              {lunar.zodiac}年
-            </div>
             <div
               className="fd-heading"
               style={{

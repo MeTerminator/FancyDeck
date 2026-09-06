@@ -106,6 +106,7 @@ const { MemoryRouter } = await import('react-router')
 const { RuntimeProvider } = await import('../src/core/runtime')
 const { Display } = await import('../src/display/Display')
 const { ConsoleApp } = await import('../src/console/App')
+const { eventTimeStatus } = await import('../src/plugins/agenda')
 
 let failures = 0
 
@@ -113,6 +114,29 @@ const check = (label: string, actual: unknown, expected: unknown) => {
   const ok = actual === expected
   if (!ok) failures += 1
   console.log(`${ok ? '  ✓' : '  ✗'} ${label}${ok ? '' : `  期望 ${expected}，实际 ${actual}`}`)
+}
+
+console.log('日程时间文案：')
+{
+  const now = new Date(2026, 8, 6, 7, 47, 26).getTime()
+  const today = eventTimeStatus({ id: 'today', title: '晨会', start: new Date(2026, 8, 6, 8).getTime() }, now)
+  const tomorrow = eventTimeStatus({ id: 'tomorrow', title: '评审', start: new Date(2026, 8, 7, 9, 30).getTime() }, now)
+  const later = eventTimeStatus({ id: 'later', title: '发布', start: new Date(2026, 8, 10, 18).getTime() }, now)
+  const ongoing = eventTimeStatus(
+    {
+      id: 'ongoing',
+      title: '讨论',
+      start: new Date(2026, 8, 6, 7, 30).getTime(),
+      end: new Date(2026, 8, 6, 8).getTime(),
+    },
+    now,
+  )
+
+  check('当日未开始事件显示倒计时和今天', today.label, '离开始 00:12:34 · 今天 08:00')
+  check('明日事件按日期在前、时间在后显示', tomorrow.label, '明天 09:30')
+  check('更晚事件显示具体日期和时间', later.label, '09/10 18:00')
+  check('进行中事件改为距离结束', ongoing.label, '离结束 00:12:34 · 今天 07:30')
+  check('进行中事件提供进度环比例', ongoing.progress, 523 / 900)
 }
 
 const errors: string[] = []
